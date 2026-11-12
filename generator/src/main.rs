@@ -1,12 +1,11 @@
 //! Corpus generator.
 //!
-//!   corpus-generator generate [--network testnet|pubnet] [--out <dir>]
-//!   corpus-generator check    [--network testnet|pubnet] [--out <dir>]
-//!
 //! `generate` writes the entries and the manifest. `check` verifies that what is on
 //! disk is exactly what `generate` would write, and that every entry decodes and
-//! re-encodes to the same bytes with the Rust XDR library.
+//! re-encodes to the same bytes with the Rust XDR library. `import-ledger` extracts
+//! one ledger from a Galexie batch file. None of the commands use the network.
 
+mod captured;
 mod entries;
 mod manifest;
 
@@ -33,28 +32,47 @@ struct Args {
     command: String,
     network: Network,
     out: PathBuf,
+    captured_from: PathBuf,
+    batch: Option<PathBuf>,
+    id: Option<String>,
 }
+
+const USAGE: &str = "usage:
+  corpus-generator generate      [--network testnet|pubnet] [--out <dir>] [--captured-from <dir>]
+  corpus-generator check         [--network testnet|pubnet] [--out <dir>] [--captured-from <dir>]
+  corpus-generator import-ledger --batch <uncompressed Galexie batch file> --id <entry id> [--out <dir>]";
 
 fn parse_args() -> Result<Args, BoxError> {
     let mut argv = std::env::args().skip(1);
-    let command = argv.next().ok_or("usage: corpus-generator <generate|check> [--network testnet|pubnet] [--out <dir>]")?;
-    let mut network = Network::TESTNET;
-    let mut out = PathBuf::from("corpus");
+    let command = argv.next().ok_or(USAGE)?;
+    let mut args = Args {
+        command,
+        network: Network::TESTNET,
+        out: PathBuf::from("corpus"),
+        captured_from: PathBuf::from("corpus"),
+        batch: None,
+        id: None,
+    };
     while let Some(flag) = argv.next() {
-        let value = argv.next().ok_or_else(|| format!("missing value for {flag}"))?;
+        let value = argv
+            .next()
+            .ok_or_else(|| format!("missing value for {flag}"))?;
         match flag.as_str() {
             "--network" => {
-                network = match value.as_str() {
+                args.network = match value.as_str() {
                     "testnet" => Network::TESTNET,
                     "pubnet" => Network::PUBNET,
                     other => return Err(format!("unknown network {other}").into()),
                 }
             }
-            "--out" => out = PathBuf::from(value),
-            other => return Err(format!("unknown argument {other}").into()),
+            "--out" => args.out = PathBuf::from(value),
+            "--captured-from" => args.captured_from = PathBuf::from(value),
+            "--batch" => args.batch = Some(PathBuf::from(value)),
+            "--id" => args.id = Some(value),
+            other => return Err(format!("unknown argument {other}\n{USAGE}").into()),
         }
     }
-    Ok(Args { command, network, out })
+    Ok(args)
 }
 
 fn file_name(id: &str) -> String {
@@ -76,16 +94,17 @@ fn check_round_trip(xdr_type: &str, bytes: &[u8]) -> Result<(), BoxError> {
     Ok(())
 }
 
-fn build(network: &Network) -> Result<(Manifest, Vec<Built>), BoxError> {
-    let built = entries::all(network, PROTOCOL_VERSION)?;
+fn build(network: &Network, captured_from: &Path) -> Result<(Manifest, Vec<Built>), BoxError> {
+    let mut built = entries::all(network, PROTOCOL_VERSION)?;
+    built.extend(captured::all(captured_from)?);
+    built.sort_by_key(|e| e.id);
     let mut ids = BTreeSet::new();
     let mut manifest_entries = Vec::with_capacity(built.len());
     for entry in &built {
         if !ids.insert(entry.id) {
             return Err(format!("duplicate entry id {}", entry.id).into());
         }
-        check_round_trip(entry.xdr_type, &entry.bytes)
-            .map_err(|e| format!("{}: {e}", entry.id))?;
+        check_round_trip(entry.xdr_type, &entry.bytes).map_err(|e| format!("{}: {e}", entry.id))?;
         for key in &entry.expect.may_refuse {
             if !entry.expect.values.contains_key(key) {
                 return Err(format!("{}: may_refuse names unknown value {key}", entry.id).into());
@@ -123,8 +142,8 @@ fn manifest_text(manifest: &Manifest) -> Result<String, BoxError> {
     Ok(format!("{}\n", serde_json::to_string_pretty(manifest)?))
 }
 
-fn generate(out: &Path, network: &Network) -> Result<(), BoxError> {
-    let (manifest, built) = build(network)?;
+fn generate(out: &Path, network: &Network, captured_from: &Path) -> Result<(), BoxError> {
+    let (manifest, built) = build(network, captured_from)?;
     let entries_dir = out.join("entries");
     fs::create_dir_all(&entries_dir)?;
 
@@ -146,8 +165,8 @@ fn generate(out: &Path, network: &Network) -> Result<(), BoxError> {
     Ok(())
 }
 
-fn check(out: &Path, network: &Network) -> Result<(), BoxError> {
-    let (expected, built) = build(network)?;
+fn check(out: &Path, network: &Network, captured_from: &Path) -> Result<(), BoxError> {
+    let (expected, built) = build(network, captured_from)?;
     let mut problems = Vec::new();
 
     let on_disk_text = fs::read_to_string(out.join("manifest.json"))?;
@@ -167,7 +186,12 @@ fn check(out: &Path, network: &Network) -> Result<(), BoxError> {
             }
         };
         if bytes.len() as u64 != entry.size {
-            problems.push(format!("{}: size is {}, manifest says {}", entry.id, bytes.len(), entry.size));
+            problems.push(format!(
+                "{}: size is {}, manifest says {}",
+                entry.id,
+                bytes.len(),
+                entry.size
+            ));
         }
         if hex::encode(Sha256::digest(&bytes)) != entry.sha256 {
             problems.push(format!("{}: sha256 does not match the manifest", entry.id));
@@ -177,7 +201,8 @@ fn check(out: &Path, network: &Network) -> Result<(), BoxError> {
         }
     }
 
-    // Synthetic entries must be byte-identical to a fresh build.
+    // Synthetic entries must be byte-identical to a fresh build, and captured
+    // entries to the committed file whose hash the generator pins.
     for entry in &built {
         match fs::read(out.join(file_name(entry.id))) {
             Ok(bytes) if bytes == entry.bytes => {}
@@ -196,18 +221,46 @@ fn check(out: &Path, network: &Network) -> Result<(), BoxError> {
     }
 
     if problems.is_empty() {
-        println!("ok: {} entries verified in {}", on_disk.entries.len(), out.display());
+        println!(
+            "ok: {} entries verified in {}",
+            on_disk.entries.len(),
+            out.display()
+        );
         Ok(())
     } else {
         Err(problems.join("\n").into())
     }
 }
 
+/// Extracts the ledger from an uncompressed Galexie batch file into the corpus.
+///
+/// This only writes the entry file. The entry still has to be described in
+/// `captured.rs`, with the hash this prints, before `generate` will list it.
+fn import_ledger(out: &Path, batch: &Path, id: &str) -> Result<(), BoxError> {
+    let (ledger_seq, bytes) = captured::ledger_from_batch(&fs::read(batch)?)?;
+    check_round_trip("LedgerCloseMeta", &bytes)?;
+    let path = out.join(file_name(id));
+    fs::create_dir_all(out.join("entries"))?;
+    fs::write(&path, &bytes)?;
+    println!(
+        "wrote ledger {ledger_seq} to {} ({} bytes, sha256 {})",
+        path.display(),
+        bytes.len(),
+        hex::encode(Sha256::digest(&bytes))
+    );
+    Ok(())
+}
+
 fn run() -> Result<(), BoxError> {
     let args = parse_args()?;
     match args.command.as_str() {
-        "generate" => generate(&args.out, &args.network),
-        "check" => check(&args.out, &args.network),
+        "generate" => generate(&args.out, &args.network, &args.captured_from),
+        "check" => check(&args.out, &args.network, &args.captured_from),
+        "import-ledger" => import_ledger(
+            &args.out,
+            args.batch.as_deref().ok_or("--batch is required")?,
+            args.id.as_deref().ok_or("--id is required")?,
+        ),
         other => Err(format!("unknown command {other}").into()),
     }
 }

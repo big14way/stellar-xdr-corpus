@@ -131,6 +131,51 @@
       "sightings": [
         "https://github.com/stellar/js-stellar-sdk/issues/1789"
       ]
+    },
+    {
+      "id": "testnet-4437357-signed-payload-signer",
+      "title": "Testnet ledger 4437357: an account adds a signed-payload signer",
+      "description": "A whole ledger as stellar-core emitted it. One SetOptions operation adds a CAP-0040 signed-payload signer, whose P address is longer than an account address. The signer appears in the transaction envelope and again in the account entry in the transaction meta.",
+      "xdr_type": "LedgerCloseMeta",
+      "file": "entries/testnet-4437357-signed-payload-signer.xdr",
+      "size": 58256,
+      "sha256": "582e694b96bf69f894763909a1b058c1a2523d5634f2e0947393cee9765f4e0e",
+      "caps": [
+        "CAP-0040"
+      ],
+      "protocol": {
+        "introduced": 19,
+        "captured": 28
+      },
+      "synthetic": false,
+      "source": {
+        "kind": "network",
+        "network_passphrase": "Test SDF Network ; September 2015",
+        "ledger_seq": 4437357,
+        "tx_hash": "d9f78749cd01297cd5f22c7f2c798c9eec93d56f399e1c4cc2f8977ca52b9fed",
+        "retrieved_from": "https://aws-public-blockchain.s3.us-east-2.amazonaws.com/v1.1/stellar/ledgers/testnet/2025-12-18/FFBC9DFF--4416000-4479999/FFBC4A92--4437357.xdr.zst"
+      },
+      "shapes": [
+        "ledger-close-meta.v2",
+        "signer.signed-payload.in-envelope",
+        "signer.signed-payload.in-meta",
+        "strkey.signed-payload"
+      ],
+      "expect": {
+        "probe": "ledger_signed_payload_signers",
+        "values": {
+          "ledger_seq": 4437357,
+          "ledger_hash": "0984e28878f8b074c3710f52630f5b6bc5a369bf61a15e7364b6123edf1881b6",
+          "protocol_version": 28,
+          "tx_count": 12,
+          "signers_in_envelopes": "PBCK2RYYLIYOSHBEL2FQLAVRSHRH3GP3ID476SGKBV7BEZHMQ6NSAAAAAAB55LN6AANMS",
+          "signers_in_meta": "PBCK2RYYLIYOSHBEL2FQLAVRSHRH3GP3ID476SGKBV7BEZHMQ6NSAAAAAAB55LN6AANMS",
+          "signer_tx_hashes": "d9f78749cd01297cd5f22c7f2c798c9eec93d56f399e1c4cc2f8977ca52b9fed"
+        }
+      },
+      "sightings": [
+        "https://github.com/stellar/wallet-backend/pull/729"
+      ]
     }
   ]
 }

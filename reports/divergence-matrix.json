@@ -54,6 +54,21 @@
         "js-stellar-sdk@17.4.0": "pass",
         "rs-stellar-xdr@30.0.0": "pass"
       }
+    },
+    {
+      "id": "testnet-4437357-signed-payload-signer",
+      "caps": [
+        "CAP-0040"
+      ],
+      "statuses": {
+        "js-stellar-sdk@16.3.0": "pass",
+        "js-stellar-sdk@16.4.1": "pass",
+        "js-stellar-sdk@17.2.0": "pass",
+        "js-stellar-sdk@17.2.1": "pass",
+        "js-stellar-sdk@17.3.0": "pass",
+        "js-stellar-sdk@17.4.0": "pass",
+        "rs-stellar-xdr@30.0.0": "pass"
+      }
     }
   ],
   "findings": [

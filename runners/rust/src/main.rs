@@ -15,8 +15,11 @@ use std::str::FromStr;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use stellar_xdr::{
-    Asset, ChangeTrustAsset, Limits, LiquidityPoolParameters, MuxedAccount, OperationBody, ReadXdr,
-    ScVal, Transaction, TransactionEnvelope, Type, TypeVariant, WriteXdr,
+    Asset, ChangeTrustAsset, FeeBumpTransactionInnerTx, GeneralizedTransactionSet, LedgerCloseMeta,
+    LedgerEntryChange, LedgerEntryChanges, LedgerEntryData, Limits, LiquidityPoolParameters,
+    MuxedAccount, Operation, OperationBody, ReadXdr, ScVal, SignerKey, Transaction,
+    TransactionEnvelope, TransactionMeta, TransactionPhase, TxSetComponent, Type, TypeVariant,
+    WriteXdr,
 };
 
 type BoxError = Box<dyn std::error::Error>;
@@ -34,7 +37,10 @@ fn limits(bytes: &[u8]) -> Limits {
 
 fn round_trip(xdr_type: &str, bytes: &[u8]) -> (&'static str, Option<String>) {
     let Ok(variant) = TypeVariant::from_str(xdr_type) else {
-        return ("unsupported", Some(format!("{xdr_type} is not defined in this library")));
+        return (
+            "unsupported",
+            Some(format!("{xdr_type} is not defined in this library")),
+        );
     };
     match Type::from_xdr(variant, bytes, limits(bytes)).and_then(|v| v.to_xdr(Limits::none())) {
         Ok(reencoded) if reencoded == bytes => ("ok", None),
@@ -44,7 +50,9 @@ fn round_trip(xdr_type: &str, bytes: &[u8]) -> (&'static str, Option<String>) {
 }
 
 fn g_address(public: &[u8; 32]) -> String {
-    stellar_strkey::ed25519::PublicKey(*public).to_string().to_string()
+    stellar_strkey::ed25519::PublicKey(*public)
+        .to_string()
+        .to_string()
 }
 
 fn muxed_parts(account: &MuxedAccount) -> Result<(u64, String), String> {
@@ -66,7 +74,8 @@ fn describe_asset(asset: &Asset) -> Result<String, String> {
 }
 
 fn first_v1_transaction(bytes: &[u8]) -> Result<(TransactionEnvelope, Transaction), String> {
-    let envelope = TransactionEnvelope::from_xdr(bytes, limits(bytes)).map_err(|e| e.to_string())?;
+    let envelope =
+        TransactionEnvelope::from_xdr(bytes, limits(bytes)).map_err(|e| e.to_string())?;
     match &envelope {
         TransactionEnvelope::Tx(v1) => {
             let tx = v1.tx.clone();
@@ -77,12 +86,8 @@ fn first_v1_transaction(bytes: &[u8]) -> Result<(TransactionEnvelope, Transactio
 }
 
 fn tx_hash(envelope: &TransactionEnvelope, entry: &Value) -> Result<Value, String> {
-    let passphrase = entry["source"]["network_passphrase"]
-        .as_str()
-        .ok_or("entry has no network passphrase")?;
-    let network_id: [u8; 32] = Sha256::digest(passphrase.as_bytes()).into();
     envelope
-        .hash(network_id)
+        .hash(network_id(entry)?)
         .map(|h| json!(hex::encode(h)))
         .map_err(|e| e.to_string())
 }
@@ -99,7 +104,10 @@ fn probe_scval_map(bytes: &[u8], _entry: &Value) -> Result<Probed, String> {
 
 fn probe_liquidity_pool_change_trust(bytes: &[u8], entry: &Value) -> Result<Probed, String> {
     let (envelope, tx) = first_v1_transaction(bytes)?;
-    let op = tx.operations.first().ok_or("transaction has no operations")?;
+    let op = tx
+        .operations
+        .first()
+        .ok_or("transaction has no operations")?;
     let OperationBody::ChangeTrust(change_trust) = &op.body else {
         return Err("first operation is not ChangeTrust".into());
     };
@@ -125,25 +133,204 @@ fn probe_liquidity_pool_change_trust(bytes: &[u8], entry: &Value) -> Result<Prob
 
 fn probe_muxed_payment(bytes: &[u8], entry: &Value) -> Result<Probed, String> {
     let (envelope, tx) = first_v1_transaction(bytes)?;
-    let op = tx.operations.first().ok_or("transaction has no operations")?;
+    let op = tx
+        .operations
+        .first()
+        .ok_or("transaction has no operations")?;
     let OperationBody::Payment(payment) = &op.body else {
         return Err("first operation is not Payment".into());
     };
-    let op_source = op.source_account.as_ref().ok_or("operation has no source account")?;
+    let op_source = op
+        .source_account
+        .as_ref()
+        .ok_or("operation has no source account")?;
     let source = muxed_parts(&tx.source_account);
     let op_source_parts = muxed_parts(op_source);
     let destination = muxed_parts(&payment.destination);
     Ok(vec![
         ("source", Ok(json!(tx.source_account.to_string()))),
-        ("source_id", source.clone().map(|(id, _)| json!(id.to_string()))),
+        (
+            "source_id",
+            source.clone().map(|(id, _)| json!(id.to_string())),
+        ),
         ("source_base", source.map(|(_, base)| json!(base))),
         ("op_source", Ok(json!(op_source.to_string()))),
-        ("op_source_id", op_source_parts.map(|(id, _)| json!(id.to_string()))),
+        (
+            "op_source_id",
+            op_source_parts.map(|(id, _)| json!(id.to_string())),
+        ),
         ("destination", Ok(json!(payment.destination.to_string()))),
-        ("destination_id", destination.clone().map(|(id, _)| json!(id.to_string()))),
+        (
+            "destination_id",
+            destination.clone().map(|(id, _)| json!(id.to_string())),
+        ),
         ("destination_base", destination.map(|(_, base)| json!(base))),
         ("amount_stroops", Ok(json!(payment.amount.to_string()))),
         ("tx_hash", tx_hash(&envelope, entry)),
+    ])
+}
+
+fn network_id(entry: &Value) -> Result<[u8; 32], String> {
+    let passphrase = entry["source"]["network_passphrase"]
+        .as_str()
+        .ok_or("entry has no network passphrase")?;
+    Ok(Sha256::digest(passphrase.as_bytes()).into())
+}
+
+fn meta_changes(meta: &TransactionMeta) -> Vec<&LedgerEntryChanges> {
+    let mut out = Vec::new();
+    match meta {
+        TransactionMeta::V0(ops) => out.extend(ops.iter().map(|op| &op.changes)),
+        TransactionMeta::V1(m) => {
+            out.push(&m.tx_changes);
+            out.extend(m.operations.iter().map(|op| &op.changes));
+        }
+        TransactionMeta::V2(m) => {
+            out.push(&m.tx_changes_before);
+            out.extend(m.operations.iter().map(|op| &op.changes));
+            out.push(&m.tx_changes_after);
+        }
+        TransactionMeta::V3(m) => {
+            out.push(&m.tx_changes_before);
+            out.extend(m.operations.iter().map(|op| &op.changes));
+            out.push(&m.tx_changes_after);
+        }
+        TransactionMeta::V4(m) => {
+            out.push(&m.tx_changes_before);
+            out.extend(m.operations.iter().map(|op| &op.changes));
+            out.push(&m.tx_changes_after);
+        }
+    }
+    out
+}
+
+fn envelope_operations(envelope: &TransactionEnvelope) -> &[Operation] {
+    match envelope {
+        TransactionEnvelope::TxV0(e) => e.tx.operations.as_slice(),
+        TransactionEnvelope::Tx(e) => e.tx.operations.as_slice(),
+        TransactionEnvelope::TxFeeBump(e) => {
+            let FeeBumpTransactionInnerTx::Tx(inner) = &e.tx.inner_tx;
+            inner.tx.operations.as_slice()
+        }
+    }
+}
+
+fn sorted_join(mut items: Vec<String>) -> Value {
+    items.sort();
+    items.dedup();
+    json!(items.join(","))
+}
+
+fn probe_ledger_signed_payload_signers(bytes: &[u8], entry: &Value) -> Result<Probed, String> {
+    let ledger = LedgerCloseMeta::from_xdr(bytes, limits(bytes)).map_err(|e| e.to_string())?;
+    let (header, tx_set, tx_count, changes) = match &ledger {
+        LedgerCloseMeta::V0(_) => return Err("LedgerCloseMeta v0 is not supported".into()),
+        LedgerCloseMeta::V1(v1) => {
+            let mut changes = Vec::new();
+            for tx in v1.tx_processing.iter() {
+                changes.push(&tx.fee_processing);
+                changes.extend(meta_changes(&tx.tx_apply_processing));
+            }
+            (
+                &v1.ledger_header,
+                &v1.tx_set,
+                v1.tx_processing.len(),
+                changes,
+            )
+        }
+        LedgerCloseMeta::V2(v2) => {
+            let mut changes = Vec::new();
+            for tx in v2.tx_processing.iter() {
+                changes.push(&tx.fee_processing);
+                changes.extend(meta_changes(&tx.tx_apply_processing));
+                changes.push(&tx.post_tx_apply_fee_processing);
+            }
+            (
+                &v2.ledger_header,
+                &v2.tx_set,
+                v2.tx_processing.len(),
+                changes,
+            )
+        }
+    };
+
+    let GeneralizedTransactionSet::V1(set) = tx_set;
+    let mut envelopes: Vec<&TransactionEnvelope> = Vec::new();
+    for phase in set.phases.iter() {
+        match phase {
+            TransactionPhase::V0(components) => {
+                for component in components.iter() {
+                    let TxSetComponent::TxsetCompTxsMaybeDiscountedFee(c) = component;
+                    envelopes.extend(c.txs.iter());
+                }
+            }
+            TransactionPhase::V1(parallel) => {
+                for stage in parallel.execution_stages.iter() {
+                    for cluster in stage.0.iter() {
+                        envelopes.extend(cluster.0.iter());
+                    }
+                }
+            }
+        }
+    }
+
+    let mut in_envelopes = Vec::new();
+    let mut signer_txs: Vec<&TransactionEnvelope> = Vec::new();
+    for envelope in envelopes {
+        for op in envelope_operations(envelope) {
+            let OperationBody::SetOptions(set_options) = &op.body else {
+                continue;
+            };
+            let Some(signer) = &set_options.signer else {
+                continue;
+            };
+            if matches!(signer.key, SignerKey::Ed25519SignedPayload(_)) {
+                in_envelopes.push(signer.key.to_string());
+                signer_txs.push(envelope);
+            }
+        }
+    }
+
+    let mut in_meta = Vec::new();
+    for change in changes.iter().flat_map(|c| c.iter()) {
+        let entry = match change {
+            LedgerEntryChange::Created(e)
+            | LedgerEntryChange::Updated(e)
+            | LedgerEntryChange::State(e)
+            | LedgerEntryChange::Restored(e) => e,
+            LedgerEntryChange::Removed(_) => continue,
+        };
+        let LedgerEntryData::Account(account) = &entry.data else {
+            continue;
+        };
+        for signer in account.signers.iter() {
+            if matches!(signer.key, SignerKey::Ed25519SignedPayload(_)) {
+                in_meta.push(signer.key.to_string());
+            }
+        }
+    }
+
+    let tx_hashes = network_id(entry).and_then(|id| {
+        signer_txs
+            .iter()
+            .map(|envelope| {
+                envelope
+                    .hash(id)
+                    .map(hex::encode)
+                    .map_err(|e| e.to_string())
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(sorted_join)
+    });
+
+    Ok(vec![
+        ("ledger_seq", Ok(json!(header.header.ledger_seq))),
+        ("ledger_hash", Ok(json!(hex::encode(header.hash.0)))),
+        ("protocol_version", Ok(json!(header.header.ledger_version))),
+        ("tx_count", Ok(json!(tx_count))),
+        ("signers_in_envelopes", Ok(sorted_join(in_envelopes))),
+        ("signers_in_meta", Ok(sorted_join(in_meta))),
+        ("signer_tx_hashes", tx_hashes),
     ])
 }
 
@@ -152,6 +339,7 @@ fn run_probe(name: &str, bytes: &[u8], entry: &Value) -> Option<Result<Probed, S
         "scval_map" => Some(probe_scval_map(bytes, entry)),
         "liquidity_pool_change_trust" => Some(probe_liquidity_pool_change_trust(bytes, entry)),
         "muxed_payment" => Some(probe_muxed_payment(bytes, entry)),
+        "ledger_signed_payload_signers" => Some(probe_ledger_signed_payload_signers(bytes, entry)),
         _ => None,
     }
 }
@@ -160,8 +348,12 @@ fn check_entry(corpus: &Path, entry: &Value) -> Result<Value, BoxError> {
     let id = entry["id"].as_str().ok_or("entry has no id")?;
     let file = entry["file"].as_str().ok_or("entry has no file")?;
     let xdr_type = entry["xdr_type"].as_str().ok_or("entry has no xdr_type")?;
-    let probe_name = entry["expect"]["probe"].as_str().ok_or("entry has no probe")?;
-    let expected = entry["expect"]["values"].as_object().ok_or("entry has no expected values")?;
+    let probe_name = entry["expect"]["probe"]
+        .as_str()
+        .ok_or("entry has no probe")?;
+    let expected = entry["expect"]["values"]
+        .as_object()
+        .ok_or("entry has no expected values")?;
     let may_refuse: Vec<&str> = entry["expect"]["may_refuse"]
         .as_array()
         .map(|a| a.iter().filter_map(Value::as_str).collect())
@@ -182,16 +374,33 @@ fn check_entry(corpus: &Path, entry: &Value) -> Result<Value, BoxError> {
         let mut value = Map::new();
         value.insert("expected".into(), expected_value.clone());
         let (outcome, detail): (&str, Option<String>) = match &probed {
-            None => ("unsupported", Some(format!("runner has no probe named {probe_name}"))),
+            None => (
+                "unsupported",
+                Some(format!("runner has no probe named {probe_name}")),
+            ),
             Some(Err(e)) => ("threw", Some(e.clone())),
             Some(Ok(pairs)) => match pairs.iter().find(|(k, _)| k == key) {
-                None => ("not_applicable", Some("this SDK has no equivalent helper".into())),
+                None => (
+                    "not_applicable",
+                    Some("this SDK has no equivalent helper".into()),
+                ),
                 Some((_, Ok(actual))) => {
                     value.insert("actual".into(), actual.clone());
-                    (if actual == expected_value { "match" } else { "mismatch" }, None)
+                    (
+                        if actual == expected_value {
+                            "match"
+                        } else {
+                            "mismatch"
+                        },
+                        None,
+                    )
                 }
                 Some((_, Err(e))) => (
-                    if may_refuse.contains(&key.as_str()) { "refused" } else { "threw" },
+                    if may_refuse.contains(&key.as_str()) {
+                        "refused"
+                    } else {
+                        "threw"
+                    },
                     Some(e.clone()),
                 ),
             },
@@ -231,7 +440,9 @@ fn run() -> Result<(), BoxError> {
     let mut out: Option<PathBuf> = None;
     let mut argv = std::env::args().skip(1);
     while let Some(flag) = argv.next() {
-        let value = argv.next().ok_or_else(|| format!("missing value for {flag}"))?;
+        let value = argv
+            .next()
+            .ok_or_else(|| format!("missing value for {flag}"))?;
         match flag.as_str() {
             "--corpus" => corpus = PathBuf::from(value),
             "--out" => out = Some(PathBuf::from(value)),
@@ -240,7 +451,9 @@ fn run() -> Result<(), BoxError> {
     }
 
     let manifest: Value = serde_json::from_str(&fs::read_to_string(corpus.join("manifest.json"))?)?;
-    let entries = manifest["entries"].as_array().ok_or("manifest has no entries")?;
+    let entries = manifest["entries"]
+        .as_array()
+        .ok_or("manifest has no entries")?;
     let results = entries
         .iter()
         .map(|entry| check_entry(&corpus, entry))

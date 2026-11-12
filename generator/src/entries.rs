@@ -50,7 +50,7 @@ impl Network {
         passphrase: "Public Global Stellar Network ; September 2015",
     };
 
-    fn id(&self) -> [u8; 32] {
+    pub fn id(&self) -> [u8; 32] {
         Sha256::digest(self.passphrase.as_bytes()).into()
     }
 }
@@ -75,13 +75,18 @@ fn public_bytes(key: &SigningKey) -> [u8; 32] {
 }
 
 fn g_address(public: [u8; 32]) -> String {
-    stellar_strkey::ed25519::PublicKey(public).to_string().to_string()
+    stellar_strkey::ed25519::PublicKey(public)
+        .to_string()
+        .to_string()
 }
 
 fn m_address(public: [u8; 32], id: u64) -> String {
-    stellar_strkey::ed25519::MuxedAccount { ed25519: public, id }
-        .to_string()
-        .to_string()
+    stellar_strkey::ed25519::MuxedAccount {
+        ed25519: public,
+        id,
+    }
+    .to_string()
+    .to_string()
 }
 
 fn account_id(public: [u8; 32]) -> AccountId {
@@ -190,7 +195,11 @@ fn issuers_ordered_differently() -> Result<([u8; 32], [u8; 32]), BoxError> {
     let first = public_bytes(&key("issuer-order/0"));
     for n in 1..10_000u32 {
         let other = public_bytes(&key(&format!("issuer-order/{n}")));
-        let (low, high) = if first < other { (first, other) } else { (other, first) };
+        let (low, high) = if first < other {
+            (first, other)
+        } else {
+            (other, first)
+        };
         if g_address(low) > g_address(high) {
             return Ok((low, high));
         }
@@ -246,7 +255,8 @@ fn change_trust_pool_issuer_order(
 
     Ok(Built {
         id: "change-trust-pool-issuers-strkey-order-reversed",
-        title: "Liquidity pool trustline whose issuers sort one way as bytes and the other as strkeys",
+        title:
+            "Liquidity pool trustline whose issuers sort one way as bytes and the other as strkeys",
         description: "Both pool assets are USD and differ only by issuer. The issuers are in \
                       network order by raw key, which is the reverse of their order as G \
                       addresses. A decoder must accept the pair and derive the same pool ID.",

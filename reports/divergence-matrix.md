@@ -15,6 +15,7 @@ Each cell is the result of decoding one corpus entry with one SDK release, re-en
 | `change-trust-pool-issuers-strkey-order-reversed` | CAP-0038 | ERROR | pass | ERROR | pass | pass | pass |
 | `payment-muxed-ids-beyond-f64` | CAP-0027 | pass | pass | pass | pass | pass | pass |
 | `scval-map-keys-collide-as-native` | CAP-0046-01 | WRONG VALUE | WRONG VALUE | WRONG VALUE | WRONG VALUE | pass | pass |
+| `testnet-4437357-signed-payload-signer` | CAP-0040 | pass | pass | pass | pass | pass | pass |
 
 ## rs-stellar-xdr
 
@@ -23,6 +24,7 @@ Each cell is the result of decoding one corpus entry with one SDK release, re-en
 | `change-trust-pool-issuers-strkey-order-reversed` | CAP-0038 | pass |
 | `payment-muxed-ids-beyond-f64` | CAP-0027 | pass |
 | `scval-map-keys-collide-as-native` | CAP-0046-01 | pass |
+| `testnet-4437357-signed-payload-signer` | CAP-0040 | pass |
 
 ## Findings
 

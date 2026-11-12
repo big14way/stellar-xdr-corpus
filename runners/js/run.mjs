@@ -93,7 +93,121 @@ const probes = {
       tx_hash: () => hex(tx.hash()),
     };
   },
+
+  ledger_signed_payload_signers(bytes, entry) {
+    const ledger = sdk.xdr.LedgerCloseMeta.fromXDR(bytes);
+    const body = armValue(ledger);
+    if (body.txProcessing === undefined || body.ext === undefined) {
+      throw new Error("LedgerCloseMeta v0 is not supported");
+    }
+    const header = field(body, "ledgerHeader");
+    const processing = field(body, "txProcessing");
+
+    // Envelopes are read through the SDK's high-level transaction classes, the
+    // way an application would read them.
+    const signerTransactions = () =>
+      txSetEnvelopes(field(body, "txSet")).flatMap((envelope) => {
+        const tx = sdk.TransactionBuilder.fromXDR(envelope.toXDR("base64"), entry.source.network_passphrase);
+        const operations = (tx.innerTransaction ?? tx).operations;
+        const signers = operations
+          .filter((op) => op.type === "setOptions" && op.signer?.ed25519SignedPayload !== undefined)
+          .map((op) => op.signer.ed25519SignedPayload);
+        return signers.length > 0 ? [{ tx, signers }] : [];
+      });
+
+    return {
+      ledger_seq: () => field(field(header, "header"), "ledgerSeq"),
+      ledger_hash: () => {
+        const hash = field(header, "hash");
+        return hex(hash.value ?? hash);
+      },
+      protocol_version: () => field(field(header, "header"), "ledgerVersion"),
+      tx_count: () => processing.length,
+      signers_in_envelopes: () => sortedJoin(signerTransactions().flatMap((t) => t.signers)),
+      signers_in_meta: () => {
+        const found = [];
+        for (const tx of processing) {
+          const lists = [field(tx, "feeProcessing"), ...metaChangeLists(field(tx, "txApplyProcessing"))];
+          if (tx.postTxApplyFeeProcessing !== undefined) lists.push(field(tx, "postTxApplyFeeProcessing"));
+          for (const change of lists.flat()) {
+            if (armTag(change) === "ledgerEntryRemoved") continue;
+            const data = field(armValue(change), "data");
+            if (armTag(data) !== "account") continue;
+            for (const signer of field(armValue(data), "signers")) {
+              const key = field(signer, "key");
+              if (armTag(key) === "signerKeyTypeEd25519SignedPayload") {
+                found.push(sdk.SignerKey.encodeSignerKey(key));
+              }
+            }
+          }
+        }
+        return sortedJoin(found);
+      },
+      signer_tx_hashes: () => sortedJoin(signerTransactions().map((t) => hex(t.tx.hash()))),
+    };
+  },
 };
+
+// ---- Helpers that hide the difference between SDK generations ---------------
+//
+// v16 exposes struct fields and union arms as methods and tags unions with
+// `switch()`. v17 exposes them as plain properties and tags unions with `type`.
+
+// Reads a struct field. A few fields were renamed between generations, so more
+// than one name can be given.
+function field(struct, ...names) {
+  for (const name of names) {
+    const member = struct[name];
+    if (member === undefined) continue;
+    return typeof member === "function" ? member.call(struct) : member;
+  }
+  throw new Error(`no field named ${names.join(" or ")}`);
+}
+
+// The value held by a union, whichever arm is set.
+function armValue(union) {
+  return typeof union.value === "function" ? union.value() : union.value;
+}
+
+// The name of a union's discriminant when it is an enum, otherwise its number.
+function armTag(union) {
+  if (typeof union.switch !== "function") return union.type;
+  const tag = union.switch();
+  return typeof tag === "object" ? tag.name : tag;
+}
+
+// Every ledger entry change list of one transaction's meta, for any meta version.
+function metaChangeLists(meta) {
+  const body = armValue(meta);
+  if (Array.isArray(body)) return body.map((op) => field(op, "changes")); // v0
+  const lists = [];
+  for (const name of ["txChanges", "txChangesBefore"]) {
+    if (body[name] !== undefined) lists.push(field(body, name));
+  }
+  for (const op of field(body, "operations")) lists.push(field(op, "changes"));
+  if (body.txChangesAfter !== undefined) lists.push(field(body, "txChangesAfter"));
+  return lists;
+}
+
+// Every transaction envelope in a generalized transaction set.
+function txSetEnvelopes(txSet) {
+  const envelopes = [];
+  for (const phase of field(armValue(txSet), "phases")) {
+    const body = armValue(phase);
+    if (Array.isArray(body)) {
+      for (const component of body) envelopes.push(...field(armValue(component), "txs", "txes"));
+    } else {
+      for (const stage of field(body, "executionStages")) {
+        for (const cluster of stage) envelopes.push(...cluster);
+      }
+    }
+  }
+  return envelopes;
+}
+
+function sortedJoin(items) {
+  return [...new Set(items)].sort().join(",");
+}
 
 // Hashes are Buffers in v16 and Uint8Arrays in v17.
 function hex(bytes) {
