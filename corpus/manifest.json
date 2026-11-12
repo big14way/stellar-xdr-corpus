@@ -1,0 +1,136 @@
+{
+  "schema_version": "0.1.0",
+  "built_with": {
+    "stellar_xdr_crate": "30.0.0",
+    "protocol_version": 30
+  },
+  "entries": [
+    {
+      "id": "change-trust-pool-issuers-strkey-order-reversed",
+      "title": "Liquidity pool trustline whose issuers sort one way as bytes and the other as strkeys",
+      "description": "Both pool assets are USD and differ only by issuer. The issuers are in network order by raw key, which is the reverse of their order as G addresses. A decoder must accept the pair and derive the same pool ID.",
+      "xdr_type": "TransactionEnvelope",
+      "file": "entries/change-trust-pool-issuers-strkey-order-reversed.xdr",
+      "size": 260,
+      "sha256": "85ebad4c07486ddcb1cb7377596c9a660944d0d17feb680674211e085d722aa4",
+      "caps": [
+        "CAP-0038"
+      ],
+      "protocol": {
+        "introduced": 18,
+        "captured": 30
+      },
+      "synthetic": true,
+      "source": {
+        "kind": "synthetic",
+        "generator": "change_trust_pool_issuer_order",
+        "network_passphrase": "Test SDF Network ; September 2015"
+      },
+      "shapes": [
+        "asset.issuer-order.strkey-differs-from-bytes",
+        "liquidity-pool.change-trust"
+      ],
+      "expect": {
+        "probe": "liquidity_pool_change_trust",
+        "values": {
+          "asset_a": "USD:GCTL7Q4WOW54T5COIXSGPVZZBKCMWBPCSGOQ6I36R6ZPSWFY2OLBYG67",
+          "asset_b": "USD:GC67PJWTGNKJ3HMGBMMISEYZUDMQPKKK65QEN2HBMQE52Z5UIYNUV74G",
+          "fee": 30,
+          "limit": "9223372036854775807",
+          "pool_id": "c0eaf88d88ab3b76bbcf09a9cd7d4b7b4105160ab4331455952fecd5f8527f5e",
+          "tx_hash": "054b640797d2c49d23daa29ede816a5e4559289865766016d7fd8bba9bc7e4d4"
+        }
+      },
+      "sightings": [
+        "https://github.com/stellar/js-stellar-sdk/pull/1766"
+      ]
+    },
+    {
+      "id": "payment-muxed-ids-beyond-f64",
+      "title": "Payment between muxed accounts with IDs 2^53+1, 0 and 2^64-1",
+      "description": "The transaction source, operation source and destination are all muxed. Two IDs and the amount are above 2^53, so a decoder that passes them through a 64-bit float reports different numbers.",
+      "xdr_type": "TransactionEnvelope",
+      "file": "entries/payment-muxed-ids-beyond-f64.xdr",
+      "size": 260,
+      "sha256": "0f4fec3101e2c477d5c957e02ae7905542942c7af38487d9f2680e7bcd457b72",
+      "caps": [
+        "CAP-0027"
+      ],
+      "protocol": {
+        "introduced": 13,
+        "captured": 30
+      },
+      "synthetic": true,
+      "source": {
+        "kind": "synthetic",
+        "generator": "payment_muxed_ids_beyond_f64",
+        "network_passphrase": "Test SDF Network ; September 2015"
+      },
+      "shapes": [
+        "muxed.transaction-source",
+        "muxed.operation-source",
+        "muxed.destination",
+        "muxed.id-zero",
+        "muxed.id-above-2-53",
+        "muxed.id-max-u64",
+        "amount.above-2-53"
+      ],
+      "expect": {
+        "probe": "muxed_payment",
+        "values": {
+          "source": "MAEBF3FW3MLXUX3NXNLRDCLZLOKJWV4QPZBPIBTVC2MSXES6SMIFUABAAAAAAAAAAE7EM",
+          "source_id": "9007199254740993",
+          "source_base": "GAEBF3FW3MLXUX3NXNLRDCLZLOKJWV4QPZBPIBTVC2MSXES6SMIFVBXG",
+          "op_source": "MAEBF3FW3MLXUX3NXNLRDCLZLOKJWV4QPZBPIBTVC2MSXES6SMIFUAAAAAAAAAAAADUTQ",
+          "op_source_id": "0",
+          "destination": "MCXIAOZ4TEIGTD224XV5Q7ZA5FRK6MUWKOQPGYD46V6J7G4I6ZP2R7777777777774TPM",
+          "destination_id": "18446744073709551615",
+          "destination_base": "GCXIAOZ4TEIGTD224XV5Q7ZA5FRK6MUWKOQPGYD46V6J7G4I6ZP2QFAZ",
+          "amount_stroops": "9007199254740993",
+          "tx_hash": "abc3ddc72fd8b03b19216da67a73134da09c5a3569d9547184c0bb3fb9a2b3e6"
+        }
+      },
+      "sightings": [
+        "https://github.com/stellar/js-stellar-sdk/issues/1785",
+        "https://github.com/stellar/wallet-backend/issues/716"
+      ]
+    },
+    {
+      "id": "scval-map-keys-collide-as-native",
+      "title": "Soroban map with u32, string and symbol keys that all print as 1",
+      "description": "Three distinct, correctly sorted map keys. Converting the map to a string-keyed native object must keep all three entries or fail loudly.",
+      "xdr_type": "ScVal",
+      "file": "entries/scval-map-keys-collide-as-native.xdr",
+      "size": 68,
+      "sha256": "72a8ce6f3fc0dc128e61d5692c4e229d1ab9b6e71a390f23db345728ec78fa44",
+      "caps": [
+        "CAP-0046-01"
+      ],
+      "protocol": {
+        "introduced": 20,
+        "captured": 30
+      },
+      "synthetic": true,
+      "source": {
+        "kind": "synthetic",
+        "generator": "scval_map_keys_collide_as_native"
+      },
+      "shapes": [
+        "scval.map.keys-collide-as-native"
+      ],
+      "expect": {
+        "probe": "scval_map",
+        "values": {
+          "raw_entry_count": 3,
+          "native_entry_count": 3
+        },
+        "may_refuse": [
+          "native_entry_count"
+        ]
+      },
+      "sightings": [
+        "https://github.com/stellar/js-stellar-sdk/issues/1789"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/big14way/stellar-xdr-corpus/schema/manifest.schema.json",
+  "title": "Stellar XDR corpus manifest",
+  "description": "Draft 0.1. Index of corpus entries. Each entry is one XDR value in its own file, tagged with the CAP and protocol version that introduced or changed its shape, where it came from, and the values a correct decoder must report.",
+  "type": "object",
+  "required": ["schema_version", "built_with", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "description": "Version of this manifest format (semver).",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "built_with": {
+      "description": "The XDR library and protocol version the corpus was last generated and verified with.",
+      "type": "object",
+      "required": ["stellar_xdr_crate", "protocol_version"],
+      "additionalProperties": false,
+      "properties": {
+        "stellar_xdr_crate": { "type": "string" },
+        "protocol_version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "xdr_type",
+        "file",
+        "size",
+        "sha256",
+        "caps",
+        "protocol",
+        "synthetic",
+        "source",
+        "shapes",
+        "expect"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Stable identifier. Never reused, never renamed.",
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "xdr_type": {
+          "description": "Name of the top-level XDR type in the file, as spelled in the .x definitions (for example LedgerCloseMeta, TransactionEnvelope, ScVal).",
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$"
+        },
+        "file": {
+          "description": "Path of the raw binary XDR file, relative to the manifest.",
+          "type": "string",
+          "pattern": "^entries/[a-z0-9-]+\\.xdr$"
+        },
+        "size": { "description": "File size in bytes.", "type": "integer", "minimum": 1 },
+        "sha256": {
+          "description": "Hex SHA-256 of the file.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "caps": {
+          "description": "CAPs that introduced or changed the shape this entry exercises.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^CAP-\\d{4}(-\\d{2})?$" }
+        },
+        "protocol": {
+          "type": "object",
+          "required": ["introduced", "captured"],
+          "additionalProperties": false,
+          "properties": {
+            "introduced": {
+              "description": "First protocol version in which the network can emit this shape.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "captured": {
+              "description": "Protocol version of the ledger or XDR definitions the entry was produced under.",
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "synthetic": {
+          "description": "True when the entry was built by the generator rather than taken from a ledger closed by stellar-core.",
+          "type": "boolean"
+        },
+        "source": {
+          "oneOf": [
+            { "$ref": "#/$defs/source_synthetic" },
+            { "$ref": "#/$defs/source_network" },
+            { "$ref": "#/$defs/source_local_core" }
+          ]
+        },
+        "shapes": {
+          "description": "Tags for the rare patterns the entry contains. Used for per-CAP coverage reports.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9]+([.-][a-z0-9]+)*$" }
+        },
+        "expect": {
+          "description": "What a correct decoder must report. Every decoder must also re-encode the value to the exact bytes in the file.",
+          "type": "object",
+          "required": ["probe", "values"],
+          "additionalProperties": false,
+          "properties": {
+            "probe": {
+              "description": "Name of the probe a runner applies to the decoded value to extract the values below.",
+              "type": "string",
+              "pattern": "^[a-z0-9_]+$"
+            },
+            "values": {
+              "description": "Expected decoded values. 64-bit integers are decimal strings so no JSON parser can round them.",
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": { "type": ["string", "integer", "boolean"] }
+            },
+            "may_refuse": {
+              "description": "Keys of values for which raising an explicit error is an accepted outcome, because the SDK's native representation cannot hold the value without loss. Returning a different value silently is never accepted.",
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "sightings": {
+          "description": "Public issues or pull requests where this shape broke a decoder or indexer.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "format": "uri" }
+        }
+      }
+    },
+    "source_synthetic": {
+      "type": "object",
+      "required": ["kind", "generator"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "synthetic" },
+        "generator": {
+          "description": "Name of the generator function that builds the entry deterministically.",
+          "type": "string"
+        },
+        "network_passphrase": {
+          "description": "Passphrase used for signatures and hashes, when the entry has any.",
+          "type": "string"
+        }
+      }
+    },
+    "source_network": {
+      "type": "object",
+      "required": ["kind", "network_passphrase", "ledger_seq"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "network" },
+        "network_passphrase": { "type": "string" },
+        "ledger_seq": { "type": "integer", "minimum": 1 },
+        "tx_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "retrieved_from": { "type": "string" }
+      }
+    },
+    "source_local_core": {
+      "type": "object",
+      "required": ["kind", "core_version", "network_passphrase"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "local-core" },
+        "core_version": { "type": "string" },
+        "network_passphrase": { "type": "string" },
+        "ledger_seq": { "type": "integer", "minimum": 1 },
+        "scenario": { "type": "string" }
+      }
+    }
+  }
+}

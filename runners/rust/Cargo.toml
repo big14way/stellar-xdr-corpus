@@ -1,0 +1,16 @@
+[package]
+name = "conformance-rust"
+version = "0.1.0"
+description = "Conformance runner for the Rust Stellar XDR library."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+stellar-xdr.workspace = true
+stellar-strkey.workspace = true
+sha2.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
