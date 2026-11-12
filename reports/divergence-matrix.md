@@ -19,12 +19,12 @@ Each cell is the result of decoding one corpus entry with one SDK release, re-en
 
 ## go-stellar-sdk
 
-| Entry | CAP | v0.9.0 |
-|---|---|---|
-| `change-trust-pool-issuers-strkey-order-reversed` | CAP-0038 | pass |
-| `payment-muxed-ids-beyond-f64` | CAP-0027 | pass |
-| `scval-map-keys-collide-as-native` | CAP-0046-01 | pass |
-| `testnet-4437357-signed-payload-signer` | CAP-0040 | pass |
+| Entry | CAP | v0.7.3 | v0.8.0 | v0.9.0 |
+|---|---|---|---|---|
+| `change-trust-pool-issuers-strkey-order-reversed` | CAP-0038 | pass | pass | pass |
+| `payment-muxed-ids-beyond-f64` | CAP-0027 | pass | pass | pass |
+| `scval-map-keys-collide-as-native` | CAP-0046-01 | pass | pass | pass |
+| `testnet-4437357-signed-payload-signer` | CAP-0040 | pass | pass | pass |
 
 ## rs-stellar-xdr
 
