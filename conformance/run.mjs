@@ -4,6 +4,8 @@
 //
 //   node conformance/run.mjs [--only js|go|rust]
 //
+// With --only, the chosen SDK is run and summarised but reports/ is not written.
+//
 // Reports are deterministic: they contain no timestamps or machine details, so
 // CI can regenerate them and fail when they differ from what is committed.
 
@@ -125,6 +127,20 @@ for (const entry of manifest.entries) {
   matrix.entries.push(row);
 }
 matrix.findings = findings;
+
+const counts = {};
+for (const row of matrix.entries) for (const s of Object.values(row.statuses)) counts[s] = (counts[s] ?? 0) + 1;
+console.log(`${manifest.entries.length} entries x ${columns.length} SDK releases:`, counts);
+
+// A partial run must not overwrite the committed reports with a partial matrix.
+if (only !== null) {
+  for (const finding of findings) {
+    console.log(`${finding.sdk}@${finding.version} ${finding.entry}: ${label[finding.status]}`);
+  }
+  console.log("partial run (--only): reports/ left untouched");
+  process.exit(0);
+}
+
 writeFileSync(join(reportsDir, "divergence-matrix.json"), `${JSON.stringify(matrix, null, 2)}\n`);
 
 // Markdown: one table per SDK so the columns stay readable.
@@ -181,7 +197,3 @@ for (const group of grouped.values()) {
   lines.push("");
 }
 writeFileSync(join(reportsDir, "divergence-matrix.md"), `${lines.join("\n").trimEnd()}\n`);
-
-const counts = {};
-for (const row of matrix.entries) for (const s of Object.values(row.statuses)) counts[s] = (counts[s] ?? 0) + 1;
-console.log(`${manifest.entries.length} entries x ${columns.length} SDK releases:`, counts);

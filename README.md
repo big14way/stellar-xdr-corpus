@@ -14,7 +14,7 @@ Running the entries through published SDK releases reproduces two known bugs on 
 
 | Entry | Bug it reproduces | Fails on | Passes on |
 |---|---|---|---|
-| `change-trust-pool-issuers-strkey-order-reversed` | [js-stellar-sdk#1766](https://github.com/stellar/js-stellar-sdk/pull/1766): a valid liquidity pool trustline cannot be decoded | 16.3.0, 17.2.0 | 16.4.1, 17.2.1 and later |
+| `change-trust-pool-issuers-strkey-order-reversed` | [js-stellar-sdk#1766](https://github.com/stellar/js-stellar-sdk/pull/1766): a valid liquidity pool trustline cannot be decoded | 16.3.0, 17.2.0 | 16.4.1, 17.2.1, 17.3.0, 17.4.0 |
 | `scval-map-keys-collide-as-native` | [js-stellar-sdk#1789](https://github.com/stellar/js-stellar-sdk/issues/1789): `scValToNative` drops map entries without an error | 16.3.0, 16.4.1, 17.2.0, 17.2.1 | 17.3.0, 17.4.0 |
 
 The fourth entry, `testnet-4437357-signed-payload-signer`, is testnet ledger 4437357 exactly as stellar-core emitted it. It contains the CAP-0040 signed-payload signer that halted wallet-backend ingestion ([wallet-backend#729](https://github.com/stellar/wallet-backend/pull/729)). Its expected ledger hash, transaction hash and signer address were checked against Horizon when it was added. All SDK releases tested decode it correctly; it is in the corpus for the indexer replay harness.
