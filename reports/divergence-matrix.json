@@ -1,0 +1,223 @@
+{
+  "schema_version": "0.1.0",
+  "columns": [
+    "js-stellar-sdk@16.3.0",
+    "js-stellar-sdk@16.4.1",
+    "js-stellar-sdk@17.2.0",
+    "js-stellar-sdk@17.2.1",
+    "js-stellar-sdk@17.3.0",
+    "js-stellar-sdk@17.4.0",
+    "rs-stellar-xdr@30.0.0"
+  ],
+  "entries": [
+    {
+      "id": "change-trust-pool-issuers-strkey-order-reversed",
+      "caps": [
+        "CAP-0038"
+      ],
+      "statuses": {
+        "js-stellar-sdk@16.3.0": "diverged_error",
+        "js-stellar-sdk@16.4.1": "pass",
+        "js-stellar-sdk@17.2.0": "diverged_error",
+        "js-stellar-sdk@17.2.1": "pass",
+        "js-stellar-sdk@17.3.0": "pass",
+        "js-stellar-sdk@17.4.0": "pass",
+        "rs-stellar-xdr@30.0.0": "pass"
+      }
+    },
+    {
+      "id": "payment-muxed-ids-beyond-f64",
+      "caps": [
+        "CAP-0027"
+      ],
+      "statuses": {
+        "js-stellar-sdk@16.3.0": "pass",
+        "js-stellar-sdk@16.4.1": "pass",
+        "js-stellar-sdk@17.2.0": "pass",
+        "js-stellar-sdk@17.2.1": "pass",
+        "js-stellar-sdk@17.3.0": "pass",
+        "js-stellar-sdk@17.4.0": "pass",
+        "rs-stellar-xdr@30.0.0": "pass"
+      }
+    },
+    {
+      "id": "scval-map-keys-collide-as-native",
+      "caps": [
+        "CAP-0046-01"
+      ],
+      "statuses": {
+        "js-stellar-sdk@16.3.0": "diverged_silent",
+        "js-stellar-sdk@16.4.1": "diverged_silent",
+        "js-stellar-sdk@17.2.0": "diverged_silent",
+        "js-stellar-sdk@17.2.1": "diverged_silent",
+        "js-stellar-sdk@17.3.0": "pass",
+        "js-stellar-sdk@17.4.0": "pass",
+        "rs-stellar-xdr@30.0.0": "pass"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "entry": "change-trust-pool-issuers-strkey-order-reversed",
+      "sdk": "js-stellar-sdk",
+      "version": "16.3.0",
+      "status": "diverged_error",
+      "sightings": [
+        "https://github.com/stellar/js-stellar-sdk/pull/1766"
+      ],
+      "problems": [
+        {
+          "what": "asset_a",
+          "outcome": "threw",
+          "expected": "USD:GCTL7Q4WOW54T5COIXSGPVZZBKCMWBPCSGOQ6I36R6ZPSWFY2OLBYG67",
+          "detail": "Assets are not in lexicographic order"
+        },
+        {
+          "what": "asset_b",
+          "outcome": "threw",
+          "expected": "USD:GC67PJWTGNKJ3HMGBMMISEYZUDMQPKKK65QEN2HBMQE52Z5UIYNUV74G",
+          "detail": "Assets are not in lexicographic order"
+        },
+        {
+          "what": "fee",
+          "outcome": "threw",
+          "expected": 30,
+          "detail": "Assets are not in lexicographic order"
+        },
+        {
+          "what": "limit",
+          "outcome": "threw",
+          "expected": "9223372036854775807",
+          "detail": "Assets are not in lexicographic order"
+        },
+        {
+          "what": "pool_id",
+          "outcome": "threw",
+          "expected": "c0eaf88d88ab3b76bbcf09a9cd7d4b7b4105160ab4331455952fecd5f8527f5e",
+          "detail": "Assets are not in lexicographic order"
+        },
+        {
+          "what": "tx_hash",
+          "outcome": "threw",
+          "expected": "054b640797d2c49d23daa29ede816a5e4559289865766016d7fd8bba9bc7e4d4",
+          "detail": "Assets are not in lexicographic order"
+        }
+      ]
+    },
+    {
+      "entry": "change-trust-pool-issuers-strkey-order-reversed",
+      "sdk": "js-stellar-sdk",
+      "version": "17.2.0",
+      "status": "diverged_error",
+      "sightings": [
+        "https://github.com/stellar/js-stellar-sdk/pull/1766"
+      ],
+      "problems": [
+        {
+          "what": "asset_a",
+          "outcome": "threw",
+          "expected": "USD:GCTL7Q4WOW54T5COIXSGPVZZBKCMWBPCSGOQ6I36R6ZPSWFY2OLBYG67",
+          "detail": "Assets are not in lexicographic order"
+        },
+        {
+          "what": "asset_b",
+          "outcome": "threw",
+          "expected": "USD:GC67PJWTGNKJ3HMGBMMISEYZUDMQPKKK65QEN2HBMQE52Z5UIYNUV74G",
+          "detail": "Assets are not in lexicographic order"
+        },
+        {
+          "what": "fee",
+          "outcome": "threw",
+          "expected": 30,
+          "detail": "Assets are not in lexicographic order"
+        },
+        {
+          "what": "limit",
+          "outcome": "threw",
+          "expected": "9223372036854775807",
+          "detail": "Assets are not in lexicographic order"
+        },
+        {
+          "what": "pool_id",
+          "outcome": "threw",
+          "expected": "c0eaf88d88ab3b76bbcf09a9cd7d4b7b4105160ab4331455952fecd5f8527f5e",
+          "detail": "Assets are not in lexicographic order"
+        },
+        {
+          "what": "tx_hash",
+          "outcome": "threw",
+          "expected": "054b640797d2c49d23daa29ede816a5e4559289865766016d7fd8bba9bc7e4d4",
+          "detail": "Assets are not in lexicographic order"
+        }
+      ]
+    },
+    {
+      "entry": "scval-map-keys-collide-as-native",
+      "sdk": "js-stellar-sdk",
+      "version": "16.3.0",
+      "status": "diverged_silent",
+      "sightings": [
+        "https://github.com/stellar/js-stellar-sdk/issues/1789"
+      ],
+      "problems": [
+        {
+          "what": "native_entry_count",
+          "outcome": "mismatch",
+          "expected": 3,
+          "actual": 1
+        }
+      ]
+    },
+    {
+      "entry": "scval-map-keys-collide-as-native",
+      "sdk": "js-stellar-sdk",
+      "version": "16.4.1",
+      "status": "diverged_silent",
+      "sightings": [
+        "https://github.com/stellar/js-stellar-sdk/issues/1789"
+      ],
+      "problems": [
+        {
+          "what": "native_entry_count",
+          "outcome": "mismatch",
+          "expected": 3,
+          "actual": 1
+        }
+      ]
+    },
+    {
+      "entry": "scval-map-keys-collide-as-native",
+      "sdk": "js-stellar-sdk",
+      "version": "17.2.0",
+      "status": "diverged_silent",
+      "sightings": [
+        "https://github.com/stellar/js-stellar-sdk/issues/1789"
+      ],
+      "problems": [
+        {
+          "what": "native_entry_count",
+          "outcome": "mismatch",
+          "expected": 3,
+          "actual": 1
+        }
+      ]
+    },
+    {
+      "entry": "scval-map-keys-collide-as-native",
+      "sdk": "js-stellar-sdk",
+      "version": "17.2.1",
+      "status": "diverged_silent",
+      "sightings": [
+        "https://github.com/stellar/js-stellar-sdk/issues/1789"
+      ],
+      "problems": [
+        {
+          "what": "native_entry_count",
+          "outcome": "mismatch",
+          "expected": 3,
+          "actual": 1
+        }
+      ]
+    }
+  ]
+}
