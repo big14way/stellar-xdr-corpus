@@ -48,16 +48,19 @@ function runJs(version) {
 }
 
 function runGo(version) {
-  // Each version gets its own module so the pinned go.mod in runners/go is untouched.
+  // Each version gets its own copy of the module so runners/go keeps its pinned
+  // go.mod. Starting from that go.mod reuses its resolved indirect dependencies.
   const dir = join(cache, "go", version);
   mkdirSync(dir, { recursive: true });
-  copyFileSync(join(root, "runners", "go", "main.go"), join(dir, "main.go"));
-  if (!existsSync(join(dir, "go.sum"))) {
-    writeFileSync(join(dir, "go.mod"),
-      `module conformance-go\n\ngo 1.25.0\n\nrequire github.com/stellar/go-stellar-sdk ${version}\n`);
-    sh("go", ["mod", "tidy"], { cwd: dir });
+  const source = join(root, "runners", "go");
+  copyFileSync(join(source, "main.go"), join(dir, "main.go"));
+  if (!existsSync(join(dir, "go.mod"))) {
+    copyFileSync(join(source, "go.mod"), join(dir, "go.mod"));
+    copyFileSync(join(source, "go.sum"), join(dir, "go.sum"));
+    sh("go", ["mod", "edit", `-require=github.com/stellar/go-stellar-sdk@${version}`], { cwd: dir });
   }
-  sh("go", ["run", ".", "--corpus", corpus, "--out", resultPath("go-stellar-sdk", version)], { cwd: dir });
+  sh("go", ["run", "-mod=mod", ".", "--corpus", corpus, "--out", resultPath("go-stellar-sdk", version)],
+    { cwd: dir });
 }
 
 function runRust() {

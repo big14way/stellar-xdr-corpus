@@ -17,6 +17,15 @@ Each cell is the result of decoding one corpus entry with one SDK release, re-en
 | `scval-map-keys-collide-as-native` | CAP-0046-01 | WRONG VALUE | WRONG VALUE | WRONG VALUE | WRONG VALUE | pass | pass |
 | `testnet-4437357-signed-payload-signer` | CAP-0040 | pass | pass | pass | pass | pass | pass |
 
+## go-stellar-sdk
+
+| Entry | CAP | v0.9.0 |
+|---|---|---|
+| `change-trust-pool-issuers-strkey-order-reversed` | CAP-0038 | pass |
+| `payment-muxed-ids-beyond-f64` | CAP-0027 | pass |
+| `scval-map-keys-collide-as-native` | CAP-0046-01 | pass |
+| `testnet-4437357-signed-payload-signer` | CAP-0040 | pass |
+
 ## rs-stellar-xdr
 
 | Entry | CAP | 30.0.0 |

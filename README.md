@@ -1,8 +1,8 @@
 # stellar-xdr-corpus
 
-A shared corpus of rare but valid Stellar ledger data, with a manifest that says what a correct decoder must report for each entry, and runners that check Stellar SDKs against it. JavaScript and Rust runners work today; Go is next.
+A shared corpus of rare but valid Stellar ledger data, with a manifest that says what a correct decoder must report for each entry, and runners that check the JavaScript, Go and Rust SDKs against it.
 
-**Status: early draft.** Four entries (three synthetic, one real testnet ledger), two runners and a divergence matrix work today. The replay harness for indexers, the linter and the hardening guide are not started. See [Roadmap](#roadmap).
+**Status: early draft.** Four entries (three synthetic, one real testnet ledger), three runners and a divergence matrix work today. The replay harness for indexers, the linter and the hardening guide are not started. See [Roadmap](#roadmap).
 
 ## Why
 
@@ -19,6 +19,40 @@ Running the entries through published SDK releases reproduces two known bugs on 
 
 The fourth entry, `testnet-4437357-signed-payload-signer`, is testnet ledger 4437357 exactly as stellar-core emitted it. It contains the CAP-0040 signed-payload signer that halted wallet-backend ingestion ([wallet-backend#729](https://github.com/stellar/wallet-backend/pull/729)). Its expected ledger hash, transaction hash and signer address were checked against Horizon when it was added. All SDK releases tested decode it correctly; it is in the corpus for the indexer replay harness.
 
+## How the parts fit
+
+Solid boxes exist today. Dashed boxes are planned.
+
+```mermaid
+flowchart LR
+  subgraph Sources
+    S1[Synthetic builders<br/>deterministic, offline]
+    S2[Testnet and mainnet ledgers<br/>Galexie data lake]
+    S3[stellar-core golden<br/>LedgerCloseMeta files]:::planned
+  end
+
+  G[Generator<br/>generate, import-ledger, check]
+  C[(Corpus<br/>XDR files + manifest)]
+
+  S1 --> G
+  S2 --> G
+  S3 -.-> G
+  G --> C
+
+  C --> R[Conformance runners<br/>JS, Go, Rust]
+  R --> M[Divergence matrix]
+  M -.-> I[Issues filed in each SDK]:::planned
+
+  C -.-> H[Replay harness<br/>adapter interface]:::planned
+  H -.-> X[Indexer under test<br/>for example wallet-backend]:::planned
+  H -.-> F[Findings report]:::planned
+
+  C -.-> D[Hardening guide<br/>field table from the manifest]:::planned
+  L[Linter]:::planned -.-> X
+
+  classDef planned stroke-dasharray: 5 5
+```
+
 ## Layout
 
 ```
@@ -26,7 +60,7 @@ corpus/manifest.json      index of entries and their expected values
 corpus/entries/*.xdr      one raw binary XDR value per entry
 schema/                   JSON Schema for the manifest
 generator/                Rust: builds the synthetic entries, imports ledgers, verifies the corpus
-runners/js|rust/          one conformance runner per SDK
+runners/js|go|rust/       one conformance runner per SDK
 conformance/              runs every SDK release in versions.json, writes the matrix
 reports/                  the generated divergence matrix
 ```
@@ -46,7 +80,7 @@ The format is defined in [`schema/manifest.schema.json`](schema/manifest.schema.
 
 ## Run it
 
-Requirements: Rust 1.87 or later and Node 20 or later.
+Requirements: Rust 1.87 or later, Node 20 or later, Go 1.25 or later.
 
 ```sh
 # Verify the corpus: hashes, sizes, round-trip through rs-stellar-xdr,
@@ -85,7 +119,6 @@ A returned value that differs is reported as **WRONG VALUE**. An error on valid 
 
 ## Roadmap
 
-- Go SDK runner
 - More entries from real testnet and mainnet ledgers, and from stellar-core's golden `LedgerCloseMeta` files
 - Per-CAP coverage report
 - Replay harness that feeds the corpus to an indexer through a documented adapter

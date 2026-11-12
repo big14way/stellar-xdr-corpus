@@ -7,6 +7,7 @@
     "js-stellar-sdk@17.2.1",
     "js-stellar-sdk@17.3.0",
     "js-stellar-sdk@17.4.0",
+    "go-stellar-sdk@v0.9.0",
     "rs-stellar-xdr@30.0.0"
   ],
   "entries": [
@@ -22,6 +23,7 @@
         "js-stellar-sdk@17.2.1": "pass",
         "js-stellar-sdk@17.3.0": "pass",
         "js-stellar-sdk@17.4.0": "pass",
+        "go-stellar-sdk@v0.9.0": "pass",
         "rs-stellar-xdr@30.0.0": "pass"
       }
     },
@@ -37,6 +39,7 @@
         "js-stellar-sdk@17.2.1": "pass",
         "js-stellar-sdk@17.3.0": "pass",
         "js-stellar-sdk@17.4.0": "pass",
+        "go-stellar-sdk@v0.9.0": "pass",
         "rs-stellar-xdr@30.0.0": "pass"
       }
     },
@@ -52,6 +55,7 @@
         "js-stellar-sdk@17.2.1": "diverged_silent",
         "js-stellar-sdk@17.3.0": "pass",
         "js-stellar-sdk@17.4.0": "pass",
+        "go-stellar-sdk@v0.9.0": "pass",
         "rs-stellar-xdr@30.0.0": "pass"
       }
     },
@@ -67,6 +71,7 @@
         "js-stellar-sdk@17.2.1": "pass",
         "js-stellar-sdk@17.3.0": "pass",
         "js-stellar-sdk@17.4.0": "pass",
+        "go-stellar-sdk@v0.9.0": "pass",
         "rs-stellar-xdr@30.0.0": "pass"
       }
     }
