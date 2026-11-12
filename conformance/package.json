@@ -1,0 +1,14 @@
+{
+  "name": "stellar-xdr-corpus-conformance",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "validate": "node validate-manifest.mjs",
+    "matrix": "node run.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1"
+  }
+}

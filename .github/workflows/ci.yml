@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  corpus:
+    name: Corpus and conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: false
+
+      - name: Format and lint
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --release --all-targets -- -D warnings
+          test -z "$(gofmt -l runners/go)"
+
+      - name: Verify the corpus
+        run: cargo run --release -p corpus-generator -- check
+
+      - name: Generation is reproducible for both networks
+        run: |
+          for network in testnet pubnet; do
+            cargo run --release -p corpus-generator -- generate --network "$network" --out "$RUNNER_TEMP/$network-a"
+            cargo run --release -p corpus-generator -- generate --network "$network" --out "$RUNNER_TEMP/$network-b"
+            diff -r "$RUNNER_TEMP/$network-a" "$RUNNER_TEMP/$network-b"
+          done
+          diff -r "$RUNNER_TEMP/testnet-a" corpus
+
+      - name: Validate the manifest against its schema
+        working-directory: conformance
+        run: |
+          npm ci --no-audit --no-fund
+          node validate-manifest.mjs
+
+      - name: Run every SDK release and rebuild the matrix
+        run: node conformance/run.mjs
+
+      - name: The committed matrix is up to date
+        run: git diff --exit-code -- reports
