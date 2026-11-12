@@ -334,3 +334,56 @@ fn ledger_signed_payload_signers(bytes: &[u8], network: &Network) -> Result<Valu
     };
     Ok(values)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn batch_import_rejects_bytes_that_are_not_a_batch() {
+        assert!(ledger_from_batch(&[]).is_err());
+        assert!(ledger_from_batch(&[0xff; 64]).is_err());
+    }
+
+    #[test]
+    fn batch_import_rejects_trailing_bytes() {
+        let batch = LedgerCloseMetaBatch {
+            start_sequence: 7,
+            end_sequence: 7,
+            ledger_close_metas: vec![LedgerCloseMeta::default()].try_into().unwrap(),
+        };
+        let mut bytes = batch.to_xdr(Limits::none()).unwrap();
+        let (seq, ledger) = ledger_from_batch(&bytes).unwrap();
+        assert_eq!(seq, 7);
+        assert_eq!(
+            ledger,
+            LedgerCloseMeta::default().to_xdr(Limits::none()).unwrap()
+        );
+        bytes.extend_from_slice(&[0, 0, 0, 0]);
+        assert!(ledger_from_batch(&bytes).is_err());
+    }
+
+    #[test]
+    fn batch_import_rejects_multi_ledger_batches() {
+        let batch = LedgerCloseMetaBatch {
+            start_sequence: 7,
+            end_sequence: 8,
+            ledger_close_metas: vec![LedgerCloseMeta::default(), LedgerCloseMeta::default()]
+                .try_into()
+                .unwrap(),
+        };
+        assert!(ledger_from_batch(&batch.to_xdr(Limits::none()).unwrap()).is_err());
+    }
+
+    #[test]
+    fn pinned_hashes_are_well_formed() {
+        for entry in ENTRIES {
+            assert_eq!(entry.sha256.len(), 64, "{}", entry.id);
+            assert!(
+                entry.sha256.bytes().all(|b| b.is_ascii_hexdigit()),
+                "{}",
+                entry.id
+            );
+        }
+    }
+}

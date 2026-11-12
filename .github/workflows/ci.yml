@@ -34,6 +34,9 @@ jobs:
           cargo clippy --release --all-targets -- -D warnings
           test -z "$(gofmt -l runners/go)"
 
+      - name: Unit tests
+        run: cargo test --release
+
       - name: Verify the corpus
         run: cargo run --release -p corpus-generator -- check
 

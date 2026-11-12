@@ -369,3 +369,94 @@ fn payment_muxed_ids_beyond_f64(
         ],
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use stellar_xdr::ReadXdr;
+
+    #[test]
+    fn issuer_pair_orders_differently_as_bytes_and_as_strkeys() {
+        let (low, high) = issuers_ordered_differently().unwrap();
+        assert!(low < high, "issuers must be in byte order");
+        assert!(
+            g_address(low) > g_address(high),
+            "strkey order must be the reverse of byte order"
+        );
+    }
+
+    #[test]
+    fn builds_are_deterministic() {
+        let a = all(&Network::TESTNET, 30).unwrap();
+        let b = all(&Network::TESTNET, 30).unwrap();
+        assert_eq!(a.len(), b.len());
+        for (x, y) in a.iter().zip(&b) {
+            assert_eq!(x.id, y.id);
+            assert_eq!(x.bytes, y.bytes);
+            assert_eq!(x.expect, y.expect);
+        }
+    }
+
+    #[test]
+    fn entry_ids_are_sorted_and_unique() {
+        let ids: Vec<_> = all(&Network::TESTNET, 30)
+            .unwrap()
+            .iter()
+            .map(|e| e.id)
+            .collect();
+        let mut sorted = ids.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(ids, sorted);
+    }
+
+    #[test]
+    fn network_changes_signed_entries_only() {
+        let testnet = all(&Network::TESTNET, 30).unwrap();
+        let pubnet = all(&Network::PUBNET, 30).unwrap();
+        for (t, p) in testnet.iter().zip(&pubnet) {
+            let signed = matches!(
+                &t.source,
+                Source::Synthetic {
+                    network_passphrase: Some(_),
+                    ..
+                }
+            );
+            assert_eq!(t.bytes != p.bytes, signed, "{}", t.id);
+        }
+    }
+
+    #[test]
+    fn signatures_verify_against_the_transaction_hash() {
+        for network in [Network::TESTNET, Network::PUBNET] {
+            for entry in all(&network, 30).unwrap() {
+                if entry.xdr_type != "TransactionEnvelope" {
+                    continue;
+                }
+                let envelope = TransactionEnvelope::from_xdr(&entry.bytes, Limits::none()).unwrap();
+                let TransactionEnvelope::Tx(v1) = &envelope else {
+                    panic!("{} is not a v1 envelope", entry.id);
+                };
+                let public = match &v1.tx.source_account {
+                    MuxedAccount::Ed25519(Uint256(public)) => public,
+                    MuxedAccount::MuxedEd25519(m) => &m.ed25519.0,
+                };
+                let hash = envelope.hash(network.id()).unwrap();
+                assert_eq!(entry.expect.values["tx_hash"], hex::encode(hash));
+                let key = ed25519_dalek::VerifyingKey::from_bytes(public).unwrap();
+                let signature =
+                    ed25519_dalek::Signature::from_slice(v1.signatures[0].signature.0.as_slice())
+                        .unwrap();
+                key.verify(&hash, &signature).unwrap();
+                assert_eq!(v1.signatures[0].hint.0, public[28..]);
+            }
+        }
+    }
+
+    #[test]
+    fn muxed_ids_survive_only_as_integers() {
+        // The point of the entry: these values change when passed through an f64.
+        assert_ne!(FIRST_UNSAFE_INTEGER as f64 as u64, FIRST_UNSAFE_INTEGER);
+        assert_ne!((u64::MAX - 1) as f64 as u64, u64::MAX - 1);
+    }
+}
