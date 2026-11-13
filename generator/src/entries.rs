@@ -8,19 +8,24 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use stellar_xdr::{
     AccountId, AlphaNum4, Asset, AssetCode4, ChangeTrustAsset, ChangeTrustOp, DecoratedSignature,
-    Limits, LiquidityPoolConstantProductParameters, LiquidityPoolParameters, Memo, MuxedAccount,
-    MuxedAccountMed25519, Operation, OperationBody, PaymentOp, Preconditions, PublicKey, ScMap,
-    ScMapEntry, ScString, ScSymbol, ScVal, SequenceNumber, Signature, SignatureHint, Transaction,
-    TransactionEnvelope, TransactionExt, TransactionV1Envelope, Uint256, Validate, WriteXdr,
+    Limits, LiquidityPoolConstantProductParameters, LiquidityPoolParameters, ManageBuyOfferOp,
+    ManageSellOfferOp, Memo, MuxedAccount, MuxedAccountMed25519, Operation, OperationBody,
+    PaymentOp, Preconditions, Price, PublicKey, ScMap, ScMapEntry, ScString, ScSymbol, ScVal,
+    SequenceNumber, Signature, SignatureHint, Transaction, TransactionEnvelope, TransactionExt,
+    TransactionV1Envelope, Uint256, Validate, WriteXdr,
 };
 
-use crate::manifest::{Expect, Protocol, Source};
+use crate::manifest::{Build, BuildAccept, Expect, Protocol, Source};
 use crate::BoxError;
 
 /// Fee charged by every constant-product pool, in basis points (CAP-0038).
 const LIQUIDITY_POOL_FEE_V18: i32 = 30;
 /// Smallest integer a 64-bit float cannot represent.
 const FIRST_UNSAFE_INTEGER: u64 = (1 << 53) + 1;
+/// An integer above 2^53 that a 64-bit float does represent. A builder handed this
+/// as a float cannot tell whether the caller meant it or a neighbour that was rounded.
+const UNSAFE_FLOAT: u64 = (1 << 53) + 2;
+const _: () = assert!(UNSAFE_FLOAT > (1 << 53));
 
 /// An entry before it is written to disk.
 pub struct Built {
@@ -34,6 +39,7 @@ pub struct Built {
     pub source: Source,
     pub shapes: &'static [&'static str],
     pub expect: Expect,
+    pub build: Option<Build>,
     pub sightings: &'static [&'static str],
 }
 
@@ -59,6 +65,7 @@ pub fn all(network: &Network, captured_protocol: u32) -> Result<Vec<Built>, BoxE
     let mut entries = vec![
         scval_map_keys_collide_as_native(captured_protocol)?,
         change_trust_pool_issuer_order(network, captured_protocol)?,
+        manage_offers_ids_beyond_f64(network, captured_protocol)?,
         payment_muxed_ids_beyond_f64(network, captured_protocol)?,
     ];
     entries.sort_by_key(|e| e.id);
@@ -104,6 +111,14 @@ fn values(value: Value) -> Map<String, Value> {
     match value {
         Value::Object(map) => map,
         _ => unreachable!("expected values are always written as a JSON object"),
+    }
+}
+
+/// A canonical builder input and what the builder must encode for it.
+fn accept(input: Value, encodes: impl Into<String>) -> BuildAccept {
+    BuildAccept {
+        input: values(input),
+        encodes: encodes.into(),
     }
 }
 
@@ -182,6 +197,7 @@ fn scval_map_keys_collide_as_native(captured_protocol: u32) -> Result<Built, Box
             })),
             may_refuse: vec!["native_entry_count".into()],
         },
+        build: None,
         sightings: &["https://github.com/stellar/js-stellar-sdk/issues/1789"],
     })
 }
@@ -287,7 +303,114 @@ fn change_trust_pool_issuer_order(
             })),
             may_refuse: vec![],
         },
+        build: None,
         sightings: &["https://github.com/stellar/js-stellar-sdk/pull/1766"],
+    })
+}
+
+/// A sell offer and a buy offer whose IDs do not fit in a 64-bit float.
+fn manage_offers_ids_beyond_f64(
+    network: &Network,
+    captured_protocol: u32,
+) -> Result<Built, BoxError> {
+    let source = key("manage-offers/source");
+    let usd = Asset::CreditAlphanum4(AlphaNum4 {
+        asset_code: AssetCode4(*b"USD\0"),
+        issuer: account_id(public_bytes(&key("manage-offers/issuer"))),
+    });
+    let sell_offer_id = i64::try_from(FIRST_UNSAFE_INTEGER)?;
+    let buy_offer_id = i64::MAX;
+    let one_to_one = Price { n: 1, d: 1 };
+
+    let tx = Transaction {
+        source_account: MuxedAccount::Ed25519(Uint256(public_bytes(&source))),
+        fee: 200,
+        seq_num: SequenceNumber((1_000_000 << 32) + 1),
+        cond: Preconditions::None,
+        memo: Memo::None,
+        operations: vec![
+            Operation {
+                source_account: None,
+                body: OperationBody::ManageSellOffer(ManageSellOfferOp {
+                    selling: usd.clone(),
+                    buying: Asset::Native,
+                    amount: 10_000_000,
+                    price: one_to_one.clone(),
+                    offer_id: sell_offer_id,
+                }),
+            },
+            Operation {
+                source_account: None,
+                body: OperationBody::ManageBuyOffer(ManageBuyOfferOp {
+                    selling: Asset::Native,
+                    buying: usd,
+                    buy_amount: 10_000_000,
+                    price: one_to_one,
+                    offer_id: buy_offer_id,
+                }),
+            },
+        ]
+        .try_into()?,
+        ext: TransactionExt::V0,
+    };
+    let (envelope, hash) = sign(tx, &source, network)?;
+
+    Ok(Built {
+        id: "manage-offers-ids-beyond-f64",
+        title: "Sell and buy offers that update offers 2^53+1 and 2^63-1",
+        description: "Both operations name an existing offer by an ID above 2^53. A decoder \
+                      that passes the ID through a 64-bit float reports a different offer, \
+                      and a builder that accepts a loosely written ID changes or creates the \
+                      wrong one: ID 0 means create a new offer.",
+        xdr_type: "TransactionEnvelope",
+        bytes: envelope.to_xdr(Limits::none())?,
+        caps: &["CAP-0006"],
+        protocol: Protocol {
+            introduced: 11,
+            captured: captured_protocol,
+        },
+        source: Source::Synthetic {
+            generator: "manage_offers_ids_beyond_f64".into(),
+            network_passphrase: Some(network.passphrase.into()),
+        },
+        shapes: &[
+            "offer.manage-sell",
+            "offer.manage-buy",
+            "offer.id-above-2-53",
+            "offer.id-max-i64",
+        ],
+        expect: Expect {
+            probe: "manage_offers".into(),
+            values: values(json!({
+                "sell_offer_id": sell_offer_id.to_string(),
+                "sell_amount_stroops": "10000000",
+                "buy_offer_id": buy_offer_id.to_string(),
+                "buy_amount_stroops": "10000000",
+                "tx_hash": hex::encode(hash),
+            })),
+            may_refuse: vec![],
+        },
+        build: Some(Build {
+            probe: "manage_offer_id".into(),
+            accept: vec![
+                accept(
+                    json!({ "offer_id": sell_offer_id.to_string() }),
+                    sell_offer_id.to_string(),
+                ),
+                accept(
+                    json!({ "offer_id": buy_offer_id.to_string() }),
+                    buy_offer_id.to_string(),
+                ),
+            ],
+            refuse: vec![
+                values(json!({ "offer_id": "" })),
+                values(json!({ "offer_id": " 16 " })),
+                values(json!({ "offer_id": "0x10" })),
+                values(json!({ "offer_id": "-1" })),
+                values(json!({ "offer_id": { "float": UNSAFE_FLOAT.to_string() } })),
+            ],
+        }),
+        sightings: &["https://github.com/stellar/js-stellar-sdk/issues/1785"],
     })
 }
 
@@ -363,6 +486,28 @@ fn payment_muxed_ids_beyond_f64(
             })),
             may_refuse: vec![],
         },
+        build: Some(Build {
+            probe: "muxed_account_id".into(),
+            accept: vec![
+                accept(
+                    json!({ "base": g_address(source_public), "id": FIRST_UNSAFE_INTEGER.to_string() }),
+                    m_address(source_public, FIRST_UNSAFE_INTEGER),
+                ),
+                accept(
+                    json!({ "base": g_address(source_public), "id": "0" }),
+                    m_address(source_public, 0),
+                ),
+                accept(
+                    json!({ "base": g_address(destination), "id": u64::MAX.to_string() }),
+                    m_address(destination, u64::MAX),
+                ),
+            ],
+            refuse: vec![
+                values(json!({ "base": g_address(source_public), "id": "" })),
+                values(json!({ "base": g_address(source_public), "id": " 16 " })),
+                values(json!({ "base": g_address(source_public), "id": "0x10" })),
+            ],
+        }),
         sightings: &[
             "https://github.com/stellar/js-stellar-sdk/issues/1785",
             "https://github.com/stellar/wallet-backend/issues/716",
@@ -394,6 +539,7 @@ mod tests {
             assert_eq!(x.id, y.id);
             assert_eq!(x.bytes, y.bytes);
             assert_eq!(x.expect, y.expect);
+            assert_eq!(x.build, y.build);
         }
     }
 
@@ -458,5 +604,50 @@ mod tests {
         // The point of the entry: these values change when passed through an f64.
         assert_ne!(FIRST_UNSAFE_INTEGER as f64 as u64, FIRST_UNSAFE_INTEGER);
         assert_ne!((u64::MAX - 1) as f64 as u64, u64::MAX - 1);
+    }
+
+    #[test]
+    fn offer_ids_do_not_survive_a_float() {
+        assert_ne!(FIRST_UNSAFE_INTEGER as f64 as u64, FIRST_UNSAFE_INTEGER);
+        assert_ne!(i64::MAX as f64 as i128, i64::MAX as i128);
+        // The float case in the build section must be a value a float holds exactly,
+        // so that the builder really receives the number the manifest names.
+        assert_eq!(UNSAFE_FLOAT as f64 as u64, UNSAFE_FLOAT);
+    }
+
+    #[test]
+    fn build_cases_are_canonical_or_not() {
+        // Every accepted input is a plain decimal string; no refused input is.
+        let canonical = |v: &Value| {
+            v.as_str().is_some_and(|s| {
+                !s.is_empty()
+                    && s.bytes().all(|b| b.is_ascii_digit())
+                    && (s == "0" || !s.starts_with('0'))
+            })
+        };
+        let id_field = |input: &Map<String, Value>| {
+            input
+                .get("id")
+                .or_else(|| input.get("offer_id"))
+                .cloned()
+                .unwrap()
+        };
+        let mut with_build = 0;
+        for entry in all(&Network::TESTNET, 30).unwrap() {
+            let Some(build) = &entry.build else { continue };
+            with_build += 1;
+            assert!(
+                !build.accept.is_empty() && !build.refuse.is_empty(),
+                "{}",
+                entry.id
+            );
+            for case in &build.accept {
+                assert!(canonical(&id_field(&case.input)), "{}", entry.id);
+            }
+            for input in &build.refuse {
+                assert!(!canonical(&id_field(input)), "{}", entry.id);
+            }
+        }
+        assert_eq!(with_build, 2);
     }
 }

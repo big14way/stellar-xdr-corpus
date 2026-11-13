@@ -80,7 +80,10 @@ const ENTRIES: &[Captured] = &[Captured {
         })
     },
     derive: ledger_signed_payload_signers,
-    sightings: &["https://github.com/stellar/wallet-backend/pull/729"],
+    sightings: &[
+        "https://github.com/stellar/wallet-backend/issues/716",
+        "https://github.com/stellar/wallet-backend/pull/729",
+    ],
 }];
 
 pub fn all(captured_from: &Path) -> Result<Vec<Built>, BoxError> {
@@ -148,6 +151,7 @@ fn load(entry: &Captured, captured_from: &Path) -> Result<Built, BoxError> {
             values: pinned,
             may_refuse: vec![],
         },
+        build: None,
         sightings: entry.sightings,
     })
 }

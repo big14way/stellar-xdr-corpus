@@ -170,6 +170,29 @@ fn probe_muxed_payment(bytes: &[u8], entry: &Value) -> Result<Probed, String> {
     ])
 }
 
+fn probe_manage_offers(bytes: &[u8], entry: &Value) -> Result<Probed, String> {
+    let (envelope, tx) = first_v1_transaction(bytes)?;
+    let [sell, buy] = tx.operations.as_slice() else {
+        return Err(format!(
+            "expected 2 operations, got {}",
+            tx.operations.len()
+        ));
+    };
+    let OperationBody::ManageSellOffer(sell) = &sell.body else {
+        return Err("first operation is not ManageSellOffer".into());
+    };
+    let OperationBody::ManageBuyOffer(buy) = &buy.body else {
+        return Err("second operation is not ManageBuyOffer".into());
+    };
+    Ok(vec![
+        ("sell_offer_id", Ok(json!(sell.offer_id.to_string()))),
+        ("sell_amount_stroops", Ok(json!(sell.amount.to_string()))),
+        ("buy_offer_id", Ok(json!(buy.offer_id.to_string()))),
+        ("buy_amount_stroops", Ok(json!(buy.buy_amount.to_string()))),
+        ("tx_hash", tx_hash(&envelope, entry)),
+    ])
+}
+
 fn network_id(entry: &Value) -> Result<[u8; 32], String> {
     let passphrase = entry["source"]["network_passphrase"]
         .as_str()
@@ -339,6 +362,7 @@ fn run_probe(name: &str, bytes: &[u8], entry: &Value) -> Option<Result<Probed, S
         "scval_map" => Some(probe_scval_map(bytes, entry)),
         "liquidity_pool_change_trust" => Some(probe_liquidity_pool_change_trust(bytes, entry)),
         "muxed_payment" => Some(probe_muxed_payment(bytes, entry)),
+        "manage_offers" => Some(probe_manage_offers(bytes, entry)),
         "ledger_signed_payload_signers" => Some(probe_ledger_signed_payload_signers(bytes, entry)),
         _ => None,
     }

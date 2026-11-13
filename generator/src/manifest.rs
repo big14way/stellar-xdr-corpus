@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-pub const SCHEMA_VERSION: &str = "0.1.0";
+pub const SCHEMA_VERSION: &str = "0.2.0";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Manifest {
@@ -34,6 +34,8 @@ pub struct Entry {
     pub source: Source,
     pub shapes: Vec<String>,
     pub expect: Expect,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<Build>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sightings: Vec<String>,
 }
@@ -79,4 +81,24 @@ pub struct Expect {
     pub values: Map<String, Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub may_refuse: Vec<String>,
+}
+
+/// Encode-side cases, for SDK builders that take untyped input such as strings.
+///
+/// `accept` lists canonical inputs and what the builder must encode for each.
+/// `refuse` lists inputs that are not a canonical value in range; a builder must
+/// raise an error for them instead of encoding some other value.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Build {
+    pub probe: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub accept: Vec<BuildAccept>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refuse: Vec<Map<String, Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BuildAccept {
+    pub input: Map<String, Value>,
+    pub encodes: String,
 }

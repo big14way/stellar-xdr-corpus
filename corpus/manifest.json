@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.1.0",
+  "schema_version": "0.2.0",
   "built_with": {
     "stellar_xdr_crate": "30.0.0",
     "protocol_version": 30
@@ -46,6 +46,83 @@
       ]
     },
     {
+      "id": "manage-offers-ids-beyond-f64",
+      "title": "Sell and buy offers that update offers 2^53+1 and 2^63-1",
+      "description": "Both operations name an existing offer by an ID above 2^53. A decoder that passes the ID through a 64-bit float reports a different offer, and a builder that accepts a loosely written ID changes or creates the wrong one: ID 0 means create a new offer.",
+      "xdr_type": "TransactionEnvelope",
+      "file": "entries/manage-offers-ids-beyond-f64.xdr",
+      "size": 304,
+      "sha256": "24b049445a347df3575a3dcbfc4cc49797a2a3b3e577c083adedea4038d7d9b0",
+      "caps": [
+        "CAP-0006"
+      ],
+      "protocol": {
+        "introduced": 11,
+        "captured": 30
+      },
+      "synthetic": true,
+      "source": {
+        "kind": "synthetic",
+        "generator": "manage_offers_ids_beyond_f64",
+        "network_passphrase": "Test SDF Network ; September 2015"
+      },
+      "shapes": [
+        "offer.manage-sell",
+        "offer.manage-buy",
+        "offer.id-above-2-53",
+        "offer.id-max-i64"
+      ],
+      "expect": {
+        "probe": "manage_offers",
+        "values": {
+          "sell_offer_id": "9007199254740993",
+          "sell_amount_stroops": "10000000",
+          "buy_offer_id": "9223372036854775807",
+          "buy_amount_stroops": "10000000",
+          "tx_hash": "b1ee340ded200805bcfd74adaee370b2fe5ff3368770d22d5245e0b8ad30d1de"
+        }
+      },
+      "build": {
+        "probe": "manage_offer_id",
+        "accept": [
+          {
+            "input": {
+              "offer_id": "9007199254740993"
+            },
+            "encodes": "9007199254740993"
+          },
+          {
+            "input": {
+              "offer_id": "9223372036854775807"
+            },
+            "encodes": "9223372036854775807"
+          }
+        ],
+        "refuse": [
+          {
+            "offer_id": ""
+          },
+          {
+            "offer_id": " 16 "
+          },
+          {
+            "offer_id": "0x10"
+          },
+          {
+            "offer_id": "-1"
+          },
+          {
+            "offer_id": {
+              "float": "9007199254740994"
+            }
+          }
+        ]
+      },
+      "sightings": [
+        "https://github.com/stellar/js-stellar-sdk/issues/1785"
+      ]
+    },
+    {
       "id": "payment-muxed-ids-beyond-f64",
       "title": "Payment between muxed accounts with IDs 2^53+1, 0 and 2^64-1",
       "description": "The transaction source, operation source and destination are all muxed. Two IDs and the amount are above 2^53, so a decoder that passes them through a 64-bit float reports different numbers.",
@@ -89,6 +166,46 @@
           "amount_stroops": "9007199254740993",
           "tx_hash": "abc3ddc72fd8b03b19216da67a73134da09c5a3569d9547184c0bb3fb9a2b3e6"
         }
+      },
+      "build": {
+        "probe": "muxed_account_id",
+        "accept": [
+          {
+            "input": {
+              "base": "GAEBF3FW3MLXUX3NXNLRDCLZLOKJWV4QPZBPIBTVC2MSXES6SMIFVBXG",
+              "id": "9007199254740993"
+            },
+            "encodes": "MAEBF3FW3MLXUX3NXNLRDCLZLOKJWV4QPZBPIBTVC2MSXES6SMIFUABAAAAAAAAAAE7EM"
+          },
+          {
+            "input": {
+              "base": "GAEBF3FW3MLXUX3NXNLRDCLZLOKJWV4QPZBPIBTVC2MSXES6SMIFVBXG",
+              "id": "0"
+            },
+            "encodes": "MAEBF3FW3MLXUX3NXNLRDCLZLOKJWV4QPZBPIBTVC2MSXES6SMIFUAAAAAAAAAAAADUTQ"
+          },
+          {
+            "input": {
+              "base": "GCXIAOZ4TEIGTD224XV5Q7ZA5FRK6MUWKOQPGYD46V6J7G4I6ZP2QFAZ",
+              "id": "18446744073709551615"
+            },
+            "encodes": "MCXIAOZ4TEIGTD224XV5Q7ZA5FRK6MUWKOQPGYD46V6J7G4I6ZP2R7777777777774TPM"
+          }
+        ],
+        "refuse": [
+          {
+            "base": "GAEBF3FW3MLXUX3NXNLRDCLZLOKJWV4QPZBPIBTVC2MSXES6SMIFVBXG",
+            "id": ""
+          },
+          {
+            "base": "GAEBF3FW3MLXUX3NXNLRDCLZLOKJWV4QPZBPIBTVC2MSXES6SMIFVBXG",
+            "id": " 16 "
+          },
+          {
+            "base": "GAEBF3FW3MLXUX3NXNLRDCLZLOKJWV4QPZBPIBTVC2MSXES6SMIFVBXG",
+            "id": "0x10"
+          }
+        ]
       },
       "sightings": [
         "https://github.com/stellar/js-stellar-sdk/issues/1785",
@@ -174,6 +291,7 @@
         }
       },
       "sightings": [
+        "https://github.com/stellar/wallet-backend/issues/716",
         "https://github.com/stellar/wallet-backend/pull/729"
       ]
     }

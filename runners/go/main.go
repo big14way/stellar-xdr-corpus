@@ -256,6 +256,38 @@ func probeMuxedPayment(data []byte, e entry) (probed, error) {
 	}, nil
 }
 
+func probeManageOffers(data []byte, e entry) (probed, error) {
+	var env xdr.TransactionEnvelope
+	if err := xdr.SafeUnmarshal(data, &env); err != nil {
+		return nil, err
+	}
+	if env.Type != xdr.EnvelopeTypeEnvelopeTypeTx || env.V1 == nil {
+		return nil, errors.New("expected a v1 transaction envelope")
+	}
+	ops := env.V1.Tx.Operations
+	if len(ops) != 2 {
+		return nil, fmt.Errorf("expected 2 operations, got %d", len(ops))
+	}
+	sell, ok := ops[0].Body.GetManageSellOfferOp()
+	if !ok {
+		return nil, errors.New("first operation is not ManageSellOffer")
+	}
+	buy, ok := ops[1].Body.GetManageBuyOfferOp()
+	if !ok {
+		return nil, errors.New("second operation is not ManageBuyOffer")
+	}
+	decimal := func(v xdr.Int64) func() (any, error) {
+		return func() (any, error) { return strconv.FormatInt(int64(v), 10), nil }
+	}
+	return probed{
+		"sell_offer_id":       decimal(sell.OfferId),
+		"sell_amount_stroops": decimal(sell.Amount),
+		"buy_offer_id":        decimal(buy.OfferId),
+		"buy_amount_stroops":  decimal(buy.BuyAmount),
+		"tx_hash":             txHash(env, e),
+	}, nil
+}
+
 // metaChangeLists returns every ledger entry change list of one transaction's
 // meta, for any meta version.
 func metaChangeLists(meta xdr.TransactionMeta) ([]xdr.LedgerEntryChanges, error) {
@@ -435,6 +467,7 @@ var probes = map[string]func([]byte, entry) (probed, error){
 	"scval_map":                     probeScvalMap,
 	"liquidity_pool_change_trust":   probeLiquidityPoolChangeTrust,
 	"muxed_payment":                 probeMuxedPayment,
+	"manage_offers":                 probeManageOffers,
 	"ledger_signed_payload_signers": probeLedgerSignedPayloadSigners,
 }
 

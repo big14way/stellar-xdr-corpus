@@ -3,6 +3,7 @@
 //
 // Decodes every corpus entry with the SDK installed in --sdk-dir, re-encodes it,
 // and applies the entry's probe to compare decoded values with the manifest.
+// Where an entry has build cases, it also feeds them to the SDK's builders.
 //
 //   node run.mjs --sdk-dir <dir containing node_modules> [--corpus ../../corpus] [--out result.json]
 
@@ -94,6 +95,21 @@ const probes = {
     };
   },
 
+  manage_offers(bytes, entry) {
+    const tx = sdk.TransactionBuilder.fromXDR(
+      Buffer.from(bytes).toString("base64"),
+      entry.source.network_passphrase,
+    );
+    const [sell, buy] = tx.operations;
+    return {
+      sell_offer_id: () => sell.offerId,
+      sell_amount_stroops: () => stroops(sell.amount),
+      buy_offer_id: () => buy.offerId,
+      buy_amount_stroops: () => stroops(buy.buyAmount),
+      tx_hash: () => hex(tx.hash()),
+    };
+  },
+
   ledger_signed_payload_signers(bytes, entry) {
     const ledger = sdk.xdr.LedgerCloseMeta.fromXDR(bytes);
     const body = armValue(ledger);
@@ -147,6 +163,69 @@ const probes = {
     };
   },
 };
+
+// Builder probes, for the manifest's `build` cases. Each gets one case's input
+// and returns what the SDK encoded for it, as a string comparable with the
+// case's `encodes`. It throws when the SDK refuses the input.
+const builders = {
+  muxed_account_id({ base, id }) {
+    return new sdk.MuxedAccount(new sdk.Account(base, "0"), id).accountId();
+  },
+
+  // Rebuilds the entry's own two operations with the given offer ID.
+  manage_offer_id({ offer_id: offerId }, bytes, entry) {
+    const tx = sdk.TransactionBuilder.fromXDR(
+      Buffer.from(bytes).toString("base64"),
+      entry.source.network_passphrase,
+    );
+    const [sell, buy] = tx.operations;
+    const encoded = [
+      sdk.Operation.manageSellOffer({ selling: sell.selling, buying: sell.buying, amount: sell.amount, price: sell.price, offerId }),
+      sdk.Operation.manageBuyOffer({ selling: buy.selling, buying: buy.buying, buyAmount: buy.buyAmount, price: buy.price, offerId }),
+    ].map((op) => field(armValue(field(op, "body")), "offerId").toString());
+    return encoded[0] === encoded[1] ? encoded[0] : `sell ${encoded[0]}, buy ${encoded[1]}`;
+  },
+};
+
+// A build input as the manifest writes it: strings stay strings, and
+// {"float": "N"} becomes the floating-point number N.
+function builderInput(input) {
+  return Object.fromEntries(
+    Object.entries(input).map(([key, value]) => [key, typeof value === "string" ? value : Number(value.float)]),
+  );
+}
+
+function checkBuild(entry, bytes) {
+  const build = entry.build;
+  const builder = builders[build.probe];
+  const results = {};
+  const attempt = (input) => {
+    if (!builder) return { outcome: "unsupported", detail: `runner has no builder probe named ${build.probe}` };
+    try {
+      return { actual: builder(builderInput(input), bytes, entry) };
+    } catch (error) {
+      return { refusal: describeError(error) };
+    }
+  };
+
+  for (const { input, encodes } of build.accept ?? []) {
+    const tried = attempt(input);
+    const result = { expected: encodes };
+    if (tried.outcome) Object.assign(result, tried);
+    else if ("refusal" in tried) Object.assign(result, { outcome: "threw", detail: tried.refusal });
+    else Object.assign(result, { actual: tried.actual, outcome: tried.actual === encodes ? "match" : "mismatch" });
+    results[`accept ${JSON.stringify(input)}`] = result;
+  }
+  for (const input of build.refuse ?? []) {
+    const tried = attempt(input);
+    const result = { expected: "refusal" };
+    if (tried.outcome) Object.assign(result, tried);
+    else if ("refusal" in tried) Object.assign(result, { outcome: "refused", detail: tried.refusal });
+    else Object.assign(result, { actual: tried.actual, outcome: "accepted" });
+    results[`refuse ${JSON.stringify(input)}`] = result;
+  }
+  return results;
+}
 
 // ---- Helpers that hide the difference between SDK generations ---------------
 //
@@ -285,8 +364,12 @@ function checkEntry(entry) {
     result.values[key] = value;
   }
 
-  const outcomes = Object.values(result.values).map((v) => v.outcome);
-  if (result.roundtrip === "mismatch" || outcomes.includes("mismatch")) result.status = "diverged_silent";
+  if (entry.build) result.build = checkBuild(entry, bytes);
+
+  // A refused input the SDK accepted is a silent divergence: it encoded a value
+  // the caller did not write.
+  const outcomes = [...Object.values(result.values), ...Object.values(result.build ?? {})].map((v) => v.outcome);
+  if (result.roundtrip === "mismatch" || outcomes.includes("mismatch") || outcomes.includes("accepted")) result.status = "diverged_silent";
   else if (result.roundtrip === "threw" || outcomes.includes("threw")) result.status = "diverged_error";
   else if (result.roundtrip === "unsupported" || outcomes.includes("unsupported")) result.status = "unsupported";
   else result.status = "pass";

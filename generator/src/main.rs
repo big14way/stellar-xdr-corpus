@@ -124,6 +124,7 @@ fn build(network: &Network, captured_from: &Path) -> Result<(Manifest, Vec<Built
             source: entry.source.clone(),
             shapes: entry.shapes.iter().map(|s| s.to_string()).collect(),
             expect: entry.expect.clone(),
+            build: entry.build.clone(),
             sightings: entry.sightings.iter().map(|s| s.to_string()).collect(),
         });
     }

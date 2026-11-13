@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/big14way/stellar-xdr-corpus/schema/manifest.schema.json",
   "title": "Stellar XDR corpus manifest",
-  "description": "Draft 0.1. Index of corpus entries. Each entry is one XDR value in its own file, tagged with the CAP and protocol version that introduced or changed its shape, where it came from, and the values a correct decoder must report.",
+  "description": "Draft 0.2. Index of corpus entries. Each entry is one XDR value in its own file, tagged with the CAP and protocol version that introduced or changed its shape, where it came from, and the values a correct decoder must report.",
   "type": "object",
   "required": ["schema_version", "built_with", "entries"],
   "additionalProperties": false,
@@ -136,12 +136,62 @@
             }
           }
         },
+        "build": {
+          "description": "Encode-side cases for SDK builders that take untyped input, such as an ID written as a string. A runner applies them only where its SDK has such a builder. At least one of `accept` and `refuse` is present.",
+          "type": "object",
+          "required": ["probe"],
+          "additionalProperties": false,
+          "minProperties": 2,
+          "properties": {
+            "probe": {
+              "description": "Name of the builder probe a runner feeds the inputs below to.",
+              "type": "string",
+              "pattern": "^[a-z0-9_]+$"
+            },
+            "accept": {
+              "description": "Canonical inputs. The builder must encode exactly the value given in `encodes`.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["input", "encodes"],
+                "additionalProperties": false,
+                "properties": {
+                  "input": { "$ref": "#/$defs/build_input" },
+                  "encodes": { "type": "string" }
+                }
+              }
+            },
+            "refuse": {
+              "description": "Inputs that are not a canonical value in range. The builder must raise an error. Encoding any value from them is a wrong value.",
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/build_input" }
+            }
+          }
+        },
         "sightings": {
           "description": "Public issues or pull requests where this shape broke a decoder or indexer.",
           "type": "array",
           "uniqueItems": true,
           "items": { "type": "string", "format": "uri" }
         }
+      }
+    },
+    "build_input": {
+      "description": "Named arguments for a builder probe. A string is passed as a string. {\"float\": \"N\"} is passed as the floating-point number N, for SDKs whose builders also take numbers.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "required": ["float"],
+            "additionalProperties": false,
+            "properties": { "float": { "type": "string", "pattern": "^-?\\d+(\\.\\d+)?$" } }
+          }
+        ]
       }
     },
     "source_synthetic": {
