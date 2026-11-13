@@ -80,13 +80,21 @@ jobs:
         run: node --test harness/harness.test.mjs
 
       - name: Reuse indexer builds
-        uses: actions/cache@v4
+        id: builds
+        uses: actions/cache/restore@v4
         with:
           path: .indexer-cache/bin
           key: indexer-builds-${{ runner.os }}-${{ hashFiles('harness/indexers.json') }}
 
       - name: Replay the corpus against every indexer commit
         run: node harness/run.mjs
+
+      - name: Keep indexer builds for the next run
+        if: always() && steps.builds.outputs.cache-hit != 'true' && hashFiles('.indexer-cache/bin/*') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .indexer-cache/bin
+          key: ${{ steps.builds.outputs.cache-primary-key }}
 
       - name: Keep the indexer logs
         if: always()
