@@ -1,0 +1,79 @@
+{
+  "schema_version": "0.2.0",
+  "columns": [
+    {
+      "indexer": "wallet-backend",
+      "repository": "https://github.com/stellar/wallet-backend",
+      "commit": "79ea2acd1dc65a07166133cc04b12e76db314db0",
+      "label": "before #693"
+    },
+    {
+      "indexer": "wallet-backend",
+      "repository": "https://github.com/stellar/wallet-backend",
+      "commit": "2a0a84ea12523b6c92e278c0c84b443041240095",
+      "label": "before #729"
+    },
+    {
+      "indexer": "wallet-backend",
+      "repository": "https://github.com/stellar/wallet-backend",
+      "commit": "2c873353c1f0f3c9b145e25a7d009023ad104a1c",
+      "label": "#729 merged"
+    },
+    {
+      "indexer": "wallet-backend",
+      "repository": "https://github.com/stellar/wallet-backend",
+      "commit": "3e22515a44979fdc3a558fda3991ca2b48e38cef",
+      "label": "main on 2026-11-12"
+    }
+  ],
+  "entries": [
+    {
+      "id": "testnet-4437357-signed-payload-signer",
+      "caps": [
+        "CAP-0040"
+      ],
+      "statuses": {
+        "wallet-backend@79ea2acd1dc65a07166133cc04b12e76db314db0": "wrong_value",
+        "wallet-backend@2a0a84ea12523b6c92e278c0c84b443041240095": "halted",
+        "wallet-backend@2c873353c1f0f3c9b145e25a7d009023ad104a1c": "pass",
+        "wallet-backend@3e22515a44979fdc3a558fda3991ca2b48e38cef": "pass"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "entry": "testnet-4437357-signed-payload-signer",
+      "indexer": "wallet-backend",
+      "commit": "79ea2acd1dc65a07166133cc04b12e76db314db0",
+      "status": "wrong_value",
+      "checked": [
+        "ledger_seq",
+        "signers_in_meta",
+        "tx_count"
+      ],
+      "problems": [
+        {
+          "what": "signers_in_meta",
+          "expected": "PBCK2RYYLIYOSHBEL2FQLAVRSHRH3GP3ID476SGKBV7BEZHMQ6NSAAAAAAB55LN6AANMS",
+          "actual": "PBCK2RYYLIYOSHBEL2FQLAVRSHRH3GP3ID476SGKBV7BEZHMQ6NSBYVM"
+        }
+      ],
+      "sightings": [
+        "https://github.com/stellar/wallet-backend/issues/716",
+        "https://github.com/stellar/wallet-backend/pull/729"
+      ]
+    },
+    {
+      "entry": "testnet-4437357-signed-payload-signer",
+      "indexer": "wallet-backend",
+      "commit": "2a0a84ea12523b6c92e278c0c84b443041240095",
+      "status": "halted",
+      "reason": "stellar address PBCK2RYYLIYOSHBEL2FQLAVRSHRH3GP3ID476SGKBV7BEZHMQ6NSAAAAAAB55LN6AANMS has a 40-byte key payload; the account_id column stores only 32-byte account/contract keys",
+      "problems": [],
+      "sightings": [
+        "https://github.com/stellar/wallet-backend/issues/716",
+        "https://github.com/stellar/wallet-backend/pull/729"
+      ]
+    }
+  ]
+}

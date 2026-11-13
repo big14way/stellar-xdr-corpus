@@ -91,6 +91,10 @@ for (const [indexerName, config] of Object.entries(indexers)) {
 
   const lake = await startLake(objects);
   const db = await startDatabase(adapter.database);
+  // Do not leave the database container behind when the run is interrupted.
+  const interrupted = () => db.stop().finally(() => process.exit(130));
+  process.once("SIGINT", interrupted);
+  process.once("SIGTERM", interrupted);
   try {
     for (const { commit, label: commitLabel } of commits) {
       const column = { indexer: indexerName, repository: adapter.repository, commit, label: commitLabel };
@@ -117,6 +121,8 @@ for (const [indexerName, config] of Object.entries(indexers)) {
       }
     }
   } finally {
+    process.off("SIGINT", interrupted);
+    process.off("SIGTERM", interrupted);
     await db.stop();
     await lake.close();
   }
