@@ -190,22 +190,22 @@ The monitoring plan covers what the project does run. CI on every push to `main`
 
 ## 8. Delivery plan
 
-Three tranches, following the SCF structure. The final tranche is the production release, which is this project's equivalent of a mainnet launch.
+Three tranches, following the SCF structure. The final tranche is the production release, which is this project's equivalent of a mainnet launch. The plan covers new work only: everything marked **built** above was done before the proposal.
 
 ### Tranche 1: corpus, coverage and conformance
 
 - Corpus of at least 40 entries covering every shape the RFP names (issuers that sort differently by strkey and by XDR bytes, muxed sources and recipients, muxed account and offer IDs, vectors at maximum length, nested authorization entries, colliding map keys) and the shapes behind its public sightings.
-- Generator support for stellar-core golden `LedgerCloseMeta` files.
+- Generator support for stellar-core golden `LedgerCloseMeta` files and for entries produced by a local stellar-core.
 - Per-CAP coverage manifest and report.
-- Conformance runner for the JavaScript, Go and Rust SDKs with the divergence matrix checked in CI.
+- Conformance runner for the JavaScript, Go and Rust SDKs with a probe for every entry, the divergence matrix checked in CI, a scheduled run against newly published SDK releases, and instructions for running the corpus in an SDK repository's own CI.
 - Hardening guide: outline and first field-by-field table.
 
 Check: `corpus-generator check` passes; every entry round-trips through rs-stellar-xdr; entries taken from golden files agree with stellar-core's `--check-lcm` goldens; the runner reproduces js-stellar-sdk#1766, #1785 and #1789 on pre-fix tags and passes on fixed ones.
 
 ### Tranche 2: replay harness and findings
 
-- Replay harness with the documented adapter interface, the Galexie-layout input and the mock RPC `getLedgers` input, and a tested memory ceiling.
-- Reference adapter for wallet-backend.
+- Replay harness with the documented adapter interface, the Galexie-layout input and the mock RPC `getLedgers` input, a result for data an indexer silently drops, and a tested memory ceiling.
+- Reference adapter for wallet-backend, including a ledger that reproduces wallet-backend#731.
 - Findings reports from running the corpus against wallet-backend and the three SDKs, one entry per finding (issue link, corpus entry, severity, affected CAP and component), each filed upstream with sibling issues in the other affected SDKs.
 - Hardening guide: complete draft, sent for review by a core or platform engineer.
 - Threat model and monitoring plan.
@@ -217,7 +217,7 @@ Check: the reference adapter reproduces wallet-backend#729, #731 and #716 on pre
 - Go linter with rule IDs for the three mistakes, and its seeded-violation test suite.
 - Hardening guide, reviewed and ready to publish on developers.stellar.org, with the checklist.
 - Second adapter, for stellar-etl, with its findings filed.
-- Release 1.0: versioned corpus releases, coverage of the current mainnet protocol, tests and CI for all tooling, and instructions for running the corpus in an SDK's or an indexer's own CI.
+- Release 1.0: versioned corpus releases, coverage of the current mainnet protocol, tests and CI for all tooling, and user documentation.
 - Published maintenance plan.
 
 Check: the linter flags every seeded violation and runs clean on current wallet-backend; the guide's field table agrees with the manifest; release 1.0 is tagged and CI is green.
