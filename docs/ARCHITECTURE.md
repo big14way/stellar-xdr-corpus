@@ -200,7 +200,7 @@ Three tranches, following the SCF structure. The final tranche is the production
 - Conformance runner for the JavaScript, Go and Rust SDKs with the divergence matrix checked in CI.
 - Hardening guide: outline and first field-by-field table.
 
-Check: `corpus-generator check` passes; every entry round-trips through rs-stellar-xdr; imported golden files match stellar-core's; the runner reproduces js-stellar-sdk#1766, #1785 and #1789 on pre-fix tags and passes on fixed ones.
+Check: `corpus-generator check` passes; every entry round-trips through rs-stellar-xdr; entries taken from golden files agree with stellar-core's `--check-lcm` goldens; the runner reproduces js-stellar-sdk#1766, #1785 and #1789 on pre-fix tags and passes on fixed ones.
 
 ### Tranche 2: replay harness and findings
 

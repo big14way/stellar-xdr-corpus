@@ -37,7 +37,7 @@ The go-stellar-sdk and rs-stellar-xdr releases tested pass every entry.
 
 ## How the parts fit
 
-Solid boxes exist today. Dashed boxes are planned.
+Solid boxes exist today. Dashed boxes are planned. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) describes each part and the delivery plan in detail.
 
 ```mermaid
 flowchart LR
