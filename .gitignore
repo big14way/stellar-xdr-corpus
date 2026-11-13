@@ -1,5 +1,6 @@
 target/
 node_modules/
 .sdk-cache/
+.indexer-cache/
 results/
 .DS_Store

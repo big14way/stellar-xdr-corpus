@@ -1,0 +1,23 @@
+{
+  "wallet-backend": {
+    "adapter": "wallet-backend.mjs",
+    "commits": [
+      {
+        "commit": "79ea2acd1dc65a07166133cc04b12e76db314db0",
+        "label": "before #693"
+      },
+      {
+        "commit": "2a0a84ea12523b6c92e278c0c84b443041240095",
+        "label": "before #729"
+      },
+      {
+        "commit": "2c873353c1f0f3c9b145e25a7d009023ad104a1c",
+        "label": "#729 merged"
+      },
+      {
+        "commit": "3e22515a44979fdc3a558fda3991ca2b48e38cef",
+        "label": "main on 2026-11-12"
+      }
+    ]
+  }
+}
