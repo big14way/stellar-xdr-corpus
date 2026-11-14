@@ -149,7 +149,7 @@ The corpus reproduces five sightings from the RFP on the versions that had them 
 
 The go-stellar-sdk and rs-stellar-xdr releases tested pass every entry. Full results: [`reports/divergence-matrix.md`](../reports/divergence-matrix.md) and [`reports/replay-matrix.md`](../reports/replay-matrix.md).
 
-One finding is already filed upstream: [js-stellar-sdk#1898](https://github.com/stellar/js-stellar-sdk/issues/1898), which asks whether the #1789 fix should reach the maintained 16.x line, where 16.4.1 still drops map entries.
+One finding is already filed upstream: [js-stellar-sdk#1898](https://github.com/stellar/js-stellar-sdk/issues/1898), which asked whether the #1789 fix should reach the maintained 16.x line, where 16.4.1 still drops map entries. The maintainers answered that it does not meet the backport conditions, so the behaviour stays on 16.x.
 
 Not yet reproduced: [wallet-backend#731](https://github.com/stellar/wallet-backend/issues/731). It needs a ledger in which the Stellar Asset Contract creates a trustline.
 
