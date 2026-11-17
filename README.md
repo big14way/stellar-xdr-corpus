@@ -4,6 +4,8 @@ A shared corpus of rare but valid Stellar ledger data, with a manifest that says
 
 **Status: early draft.** Five entries (four synthetic, one real testnet ledger), three SDK runners, a divergence matrix and a replay harness with one indexer adapter (wallet-backend) work today. The linter and the hardening guide are not started. See [Roadmap](#roadmap).
 
+**Demo video (3.5 minutes):** https://youtu.be/GhI8Vp5Vj2E
+
 ## Why
 
 Every application that reads the Stellar ledger decodes XDR. Rare transaction shapes keep breaking decoders and indexers, and each team finds the same bugs on its own. This repository collects those shapes in one place so a bug found once becomes a test every SDK and indexer can run.
